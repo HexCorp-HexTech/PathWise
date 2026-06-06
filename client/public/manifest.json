@@ -1,6 +1,6 @@
 {
-  "name": "VidhyaPath — Adaptive Learning",
-  "short_name": "VidhyaPath",
+  "name": "PathWise — Adaptive Learning",
+  "short_name": "PathWise",
   "description": "AI-powered personalized learning paths for every student",
   "start_url": "/",
   "display": "standalone",

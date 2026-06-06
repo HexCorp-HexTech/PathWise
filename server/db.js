@@ -8,8 +8,8 @@ const __dirname = path.dirname(__filename);
 // Vercel Serverless Hack: Vercel's filesystem is read-only except for /tmp.
 const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
 const DB_PATH = isVercel 
-  ? '/tmp/vidyapath.db' 
-  : path.join(__dirname, 'vidyapath.db');
+  ? '/tmp/pathwise.db' 
+  : path.join(__dirname, 'pathwise.db');
 
 // Create database with better-sqlite3 (10x faster, production-ready)
 const db = new Database(DB_PATH);
@@ -103,18 +103,6 @@ db.exec(`
     UNIQUE(student_id, subject),
     FOREIGN KEY (student_id) REFERENCES students(id)
   );
-
-  CREATE TABLE IF NOT EXISTS quiz_attempts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    student_id INTEGER NOT NULL,
-    topic_name TEXT NOT NULL,
-    score INTEGER NOT NULL,
-    total INTEGER NOT NULL,
-    status TEXT DEFAULT 'complete',
-    weak_concepts TEXT DEFAULT '[]',
-    attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES students(id)
-  );
 `);
 
 // Migration: add columns safely
@@ -138,21 +126,6 @@ addColumnSafe('topic_progress', 'completed_at', "DATETIME");
 addColumnSafe('learning_paths', 'update_reason', "TEXT DEFAULT ''");
 addColumnSafe('student_syllabus', 'updated_at', "DATETIME DEFAULT CURRENT_TIMESTAMP");
 
-// Ensure quiz_attempts table exists (migration for existing DBs)
-try {
-  db.exec(`CREATE TABLE IF NOT EXISTS quiz_attempts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    student_id INTEGER NOT NULL,
-    topic_name TEXT NOT NULL,
-    score INTEGER NOT NULL,
-    total INTEGER NOT NULL,
-    status TEXT DEFAULT 'complete',
-    weak_concepts TEXT DEFAULT '[]',
-    attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES students(id)
-  )`);
-} catch(e) {}
-
 // Indexes for fast queries at scale (thousands of students)
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_students_username ON students(username);
@@ -170,8 +143,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sessions_timestamp ON sessions(student_id, timestamp);
   CREATE INDEX IF NOT EXISTS idx_student_syllabus_student ON student_syllabus(student_id);
   CREATE INDEX IF NOT EXISTS idx_student_syllabus_subject ON student_syllabus(student_id, subject);
-  CREATE INDEX IF NOT EXISTS idx_quiz_attempts_student ON quiz_attempts(student_id);
-  CREATE INDEX IF NOT EXISTS idx_quiz_attempts_topic ON quiz_attempts(student_id, topic_name);
 `);
 
 // Seed demo teacher if none
