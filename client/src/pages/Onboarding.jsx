@@ -40,13 +40,20 @@ export default function Onboarding({ t, lang, studentId, onComplete, toggleLang 
       const profile = { id:studentId, name:form.name.trim()||'Student', age:parseInt(form.age)||14, grade:parseInt(form.grade)||8, board:form.board, goals:form.goals.join(','), level:form.level||'beginner', study_time:form.study_time, language:lang, device_type:'desktop', connectivity:'4g' };
       const student = await createStudent(profile);
       const sid = student.id || studentId;
-      await generatePath(sid);
-      try {
-        const r = await fetch(`${API_BASE}/lesson/notes`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:sid,board:form.board,grade:parseInt(form.grade)||8,subjects:form.goals.join(',')})});
-        const d = await r.json(); if(d?.notes) localStorage.setItem('pw_offline_notes',JSON.stringify(d.notes));
-      } catch {}
       onComplete(sid);
-    } catch (err) { console.error(err); setLoading(false); }
+
+      generatePath(sid).catch((err) => {
+        console.warn('Learning path generation will be retried later:', err);
+      });
+
+      fetch(`${API_BASE}/lesson/notes`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:sid,board:form.board,grade:parseInt(form.grade)||8,subjects:form.goals.join(',')})})
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if(d?.notes) localStorage.setItem('pw_offline_notes',JSON.stringify(d.notes)); })
+        .catch(() => {});
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
   };
 
   if (loading) return (

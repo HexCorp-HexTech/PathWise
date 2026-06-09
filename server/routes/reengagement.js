@@ -7,10 +7,10 @@ const router = Router();
 
 router.get('/:student_id', async (req, res) => {
   try {
-    const student = getOne('SELECT * FROM students WHERE id = ?', [parseInt(req.params.student_id)]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [parseInt(req.params.student_id)]);
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
-    const lastTopic = getOne(
+    const lastTopic = await getOne(
       "SELECT topic_name FROM topic_progress WHERE student_id = ? AND status != 'pending' ORDER BY completed_at DESC LIMIT 1",
       [parseInt(req.params.student_id)]
     );

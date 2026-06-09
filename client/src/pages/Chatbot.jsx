@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { sendChatMessage } from '../utils/api';
+import { API_BASE } from '../utils/api';
 
 export default function Chatbot({ lang, studentId, onClose }) {
   const [messages, setMessages] = useState([
@@ -18,7 +18,8 @@ export default function Chatbot({ lang, studentId, onClose }) {
     setMessages(prev=>[...prev,{role:'user',content:msg}]);
     setLoading(true);
     try {
-      const data = await sendChatMessage(studentId, msg, messages.slice(-8));
+      const res=await fetch(`${API_BASE}/chat/message`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:studentId,message:msg,history:messages.slice(-8)})});
+      const data=await res.json();
       setMessages(prev=>[...prev,{role:'assistant',content:data.reply,ai:data.ai_powered}]);
     } catch {
       setMessages(prev=>[...prev,{role:'assistant',content:lang==='hi'?'❌ जवाब नहीं मिला। फिर कोशिश करें।':'❌ Could not get a response. Please try again.'}]);

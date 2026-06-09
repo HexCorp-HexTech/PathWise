@@ -143,7 +143,7 @@ function generateLessonLocal(topicName, grade, level, language) {
 router.post('/generate', async (req, res) => {
   try {
     const { student_id, topic_name } = req.body;
-    const student = getOne('SELECT * FROM students WHERE id = ?', [student_id]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [student_id]);
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
     let lesson = null;
@@ -169,7 +169,7 @@ router.post('/notes', async (req, res) => {
     const { board, grade, subjects, student_id } = req.body;
     const subjectList = subjects ? subjects.split(',').map(s => s.trim()) : getSubjects(board || 'CBSE', parseInt(grade) || 8);
     const notes = {};
-    const student = student_id ? getOne('SELECT * FROM students WHERE id = ?', [student_id]) : null;
+    const student = student_id ? await getOne('SELECT * FROM students WHERE id = ?', [student_id]) : null;
 
     for (const subject of subjectList) {
       const chapters = getChapters(board || 'CBSE', subject, parseInt(grade) || 8);
@@ -183,7 +183,7 @@ router.post('/notes', async (req, res) => {
         let weakConcepts = [];
         if (student) {
           try {
-            const pastProgress = getOne('SELECT weak_concepts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student.id, ch.name]);
+            const pastProgress = await getOne('SELECT weak_concepts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student.id, ch.name]);
             if (pastProgress?.weak_concepts) {
               weakConcepts = JSON.parse(pastProgress.weak_concepts);
             }
@@ -247,12 +247,12 @@ router.post('/notes', async (req, res) => {
 router.post('/chapter-notes', async (req, res) => {
   try {
     const { chapter, board, grade, subject, student_id } = req.body;
-    const student = student_id ? getOne('SELECT * FROM students WHERE id = ?', [student_id]) : null;
+    const student = student_id ? await getOne('SELECT * FROM students WHERE id = ?', [student_id]) : null;
     
     let weakConcepts = [];
     if (student) {
       try {
-        const pastProgress = getOne('SELECT weak_concepts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student.id, chapter]);
+        const pastProgress = await getOne('SELECT weak_concepts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student.id, chapter]);
         if (pastProgress?.weak_concepts) {
           weakConcepts = JSON.parse(pastProgress.weak_concepts);
         }

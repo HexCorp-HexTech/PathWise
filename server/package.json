@@ -8,10 +8,9 @@
     "dev": "node --watch index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.8.0",
+    "@libsql/client": "^0.17.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.1",
-    "sql.js": "^1.11.0"
+    "dotenv": "^16.6.1",
+    "express": "^4.21.1"
   }
 }

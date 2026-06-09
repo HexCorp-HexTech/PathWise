@@ -14,7 +14,7 @@ const MODEL = 'google/gemini-2.0-flash-001';
 router.post('/message', async (req, res) => {
   try {
     const { student_id, message, history } = req.body;
-    const student = getOne('SELECT * FROM students WHERE id = ?', [student_id]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [student_id]);
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
     const syllabusCtx = getSyllabusContext(student.board || 'CBSE', student.grade, student.goals);

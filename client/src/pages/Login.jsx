@@ -51,7 +51,7 @@ export default function Login({ t, lang, onStudentLogin, onTeacherLogin, toggleL
         <div className="login-left-decoration" />
         <div className="login-left-decoration2" />
         <div className="login-brand">
-          <div className="login-brand-icon">V</div>
+          <img className="login-brand-logo" src="/logo.svg" alt="VidyaPath" />
           <div>
             <div className="login-brand-text">Vidya<span>Path</span></div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>ज्ञान की राह</div>

@@ -1,9 +1,5 @@
 import { Router } from "express";
-import {
-  generateLesson,
-  generateNotes,
-  generateQuiz,
-} from "../services/aiService.js";
+import { getLesson, getNotes, getQuiz } from "../services/contentService.js";
 
 const router = Router();
 
@@ -11,13 +7,12 @@ function validateSelection(body) {
   const standard = String(body.standard || "").trim();
   const subject = String(body.subject || "").trim();
   const chapter = String(body.chapter || "").trim();
-  const studentId = Number(body.studentId || 0) || null;
 
   if (!standard || !subject || !chapter) {
     return null;
   }
 
-  return { standard, subject, chapter, studentId };
+  return { standard, subject, chapter };
 }
 
 router.post("/lesson", async (req, res) => {
@@ -27,11 +22,12 @@ router.post("/lesson", async (req, res) => {
   }
 
   try {
-    const result = await generateLesson(selection.chapter, null, {
-      standard: selection.standard,
-      subject: selection.subject,
-      studentId: selection.studentId,
-    });
+    const result = await getLesson(
+      selection.standard,
+      selection.subject,
+      selection.chapter
+    );
+    // Pass through all metadata (lesson, source, ai_powered, reason)
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message || "Failed to load lesson" });
@@ -45,12 +41,12 @@ router.post("/notes", async (req, res) => {
   }
 
   try {
-    const lessonText = String(req.body.lesson || "").trim();
-    const result = await generateNotes(selection.chapter, lessonText, {
-      standard: selection.standard,
-      subject: selection.subject,
-      studentId: selection.studentId,
-    });
+    const result = await getNotes(
+      selection.standard,
+      selection.subject,
+      selection.chapter
+    );
+    // Pass through all metadata (notes, source, ai_powered, reason)
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message || "Failed to load notes" });
@@ -64,11 +60,12 @@ router.post("/quiz", async (req, res) => {
   }
 
   try {
-    const result = await generateQuiz(selection.chapter, {
-      standard: selection.standard,
-      subject: selection.subject,
-      studentId: selection.studentId,
-    });
+    const result = await getQuiz(
+      selection.standard,
+      selection.subject,
+      selection.chapter
+    );
+    // Pass through all metadata (quiz, source, ai_powered, reason)
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message || "Failed to load quiz" });

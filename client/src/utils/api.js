@@ -1,270 +1,298 @@
-export const API_BASE = import.meta.env.DEV ? "http://localhost:3001/api" : "/api";
-
-const OFFLINE_QUEUE_KEY = "pw_offline_queue";
-const CACHE_PREFIX = "pw_cache_";
+export const API_BASE = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api';
 
 function getHeaders() {
-  return { "Content-Type": "application/json" };
+  return { 'Content-Type': 'application/json' };
 }
 
-function cacheKey(key) {
-  return `${CACHE_PREFIX}${key}`;
-}
-
-function writeCache(key, data) {
-  try {
-    localStorage.setItem(cacheKey(key), JSON.stringify({ data, updatedAt: Date.now() }));
-  } catch (error) {
-    console.warn("Cache write failed", error);
-  }
-}
-
-function readCache(key) {
-  try {
-    const raw = localStorage.getItem(cacheKey(key));
-    return raw ? JSON.parse(raw).data : null;
-  } catch {
-    return null;
-  }
-}
-
-function enqueueOfflineAction(action) {
-  const queue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
+function queueOfflineAction(action) {
+  const queue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
   queue.push({ ...action, timestamp: Date.now() });
-  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  localStorage.setItem('offlineQueue', JSON.stringify(queue));
 }
 
-async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: getHeaders(),
-    ...options,
-  });
+export async function syncOfflineActions() {
+  const queue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
+  if (queue.length === 0) return;
+  const remaining = [];
+  for (const action of queue) {
+    try {
+      await fetch(`${API_BASE}${action.url}`, { method: action.method, headers: getHeaders(), body: JSON.stringify(action.body) });
+    } catch { remaining.push(action); }
+  }
+  localStorage.setItem('offlineQueue', JSON.stringify(remaining));
+}
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || "Request failed");
+function cacheData(key, data) {
+  try { localStorage.setItem(`pw_${key}`, JSON.stringify({ data, cached_at: Date.now() })); } catch (e) { console.warn('Cache write failed:', e); }
+}
+
+function getCachedData(key) {
+  try { const item = localStorage.getItem(`pw_${key}`); if (item) return JSON.parse(item).data; } catch { }
+  return null;
+}
+
+async function readJson(res, fallbackMessage) {
+  const text = await res.text();
+  let data = null;
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      const preview = text.replace(/\s+/g, ' ').trim().slice(0, 120);
+      throw new Error(`${fallbackMessage}. Server returned non-JSON response${preview ? `: ${preview}` : ''}`);
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || fallbackMessage);
   }
 
   return data;
 }
 
-async function requestWithCache(path, cacheName, options = {}) {
-  try {
-    const data = await request(path, options);
-    writeCache(cacheName, data);
-    return data;
-  } catch (error) {
-    const cached = readCache(cacheName);
-    if (cached) {
-      return { ...cached, offline: true };
-    }
-    throw error;
-  }
-}
-
-export async function syncOfflineActions() {
-  const queue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
-  if (queue.length === 0) return;
-
-  const remaining = [];
-  for (const action of queue) {
-    try {
-      await request(action.path, {
-        method: action.method,
-        body: JSON.stringify(action.body),
-      });
-    } catch {
-      remaining.push(action);
-    }
-  }
-
-  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
-}
-
-export function getSavedStudentId() {
-  return localStorage.getItem("pw_student_id");
-}
-
-export function getSavedRole() {
-  return localStorage.getItem("pw_user_role");
-}
-
-export function getSavedTeacher() {
-  try {
-    return JSON.parse(localStorage.getItem("pw_teacher"));
-  } catch {
-    return null;
-  }
-}
-
-export function getLanguage() {
-  return localStorage.getItem("pw_language") || "en";
-}
-
-export function setLanguage(lang) {
-  localStorage.setItem("pw_language", lang);
-}
-
-export function logout() {
-  localStorage.removeItem("pw_student_id");
-  localStorage.removeItem("pw_teacher");
-  localStorage.removeItem("pw_user_role");
-}
-
+// ===== AUTH =====
 export async function studentSignup(profile) {
-  const student = await request("/auth/signup", {
-    method: "POST",
-    body: JSON.stringify(profile),
-  });
-  localStorage.setItem("pw_student_id", student.id);
-  localStorage.setItem("pw_user_role", "student");
-  writeCache(`student_${student.id}`, student);
+  const res = await fetch(`${API_BASE}/auth/signup`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(profile) });
+  const student = await readJson(res, 'Signup failed');
+  localStorage.setItem('pw_student_id', student.id);
+  localStorage.setItem('pw_user_role', 'student');
+  cacheData(`student_${student.id}`, student);
   return student;
 }
 
 export async function studentLogin(username, password) {
-  const student = await request("/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ username, password }),
-  });
-  localStorage.setItem("pw_student_id", student.id);
-  localStorage.setItem("pw_user_role", "student");
-  writeCache(`student_${student.id}`, student);
+  const res = await fetch(`${API_BASE}/auth/login`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ username, password }) });
+  const student = await readJson(res, 'Login failed');
+  localStorage.setItem('pw_student_id', student.id);
+  localStorage.setItem('pw_user_role', 'student');
+  cacheData(`student_${student.id}`, student);
   return student;
 }
 
 export async function teacherSignup(profile) {
-  return request("/auth/teacher/signup", {
-    method: "POST",
-    body: JSON.stringify(profile),
-  });
+  const res = await fetch(`${API_BASE}/auth/teacher/signup`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(profile) });
+  return await readJson(res, 'Signup failed');
 }
 
 export async function teacherLoginAuth(username, password) {
-  const teacher = await request("/teacher/login", {
-    method: "POST",
-    body: JSON.stringify({ username, password }),
-  });
-  localStorage.setItem("pw_teacher", JSON.stringify(teacher));
-  localStorage.setItem("pw_user_role", "teacher");
+  const res = await fetch(`${API_BASE}/auth/teacher/login`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ username, password }) });
+  const teacher = await readJson(res, 'Login failed');
+  localStorage.setItem('pw_teacher', JSON.stringify(teacher));
+  localStorage.setItem('pw_user_role', 'teacher');
   return teacher;
 }
 
+export function logout() {
+  localStorage.removeItem('pw_student_id');
+  localStorage.removeItem('pw_teacher');
+  localStorage.removeItem('pw_user_role');
+}
+
+export function getSavedRole() {
+  return localStorage.getItem('pw_user_role');
+}
+
+export function getSavedTeacher() {
+  try { return JSON.parse(localStorage.getItem('pw_teacher')); } catch { return null; }
+}
+
+// ===== STUDENT API =====
 export async function createStudent(profile) {
-  const student = await request("/students", {
-    method: "POST",
-    body: JSON.stringify(profile),
-  });
-  writeCache(`student_${student.id}`, student);
-  localStorage.setItem("pw_student_id", student.id);
-  return student;
+  try {
+    const res = await fetch(`${API_BASE}/students`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(profile) });
+    const student = await res.json();
+    cacheData(`student_${student.id}`, student);
+    localStorage.setItem('pw_student_id', student.id);
+    return student;
+  } catch (err) { console.error('Create student failed:', err); throw err; }
 }
 
 export async function getStudent(id) {
-  return requestWithCache(`/students/${id}`, `student_${id}`);
+  try {
+    const res = await fetch(`${API_BASE}/students/${id}`);
+    const data = await res.json();
+    cacheData(`student_${id}`, data);
+    return data;
+  } catch { return getCachedData(`student_${id}`); }
 }
 
 export async function generatePath(studentId) {
-  return request("/path/generate", {
-    method: "POST",
-    body: JSON.stringify({ student_id: studentId }),
-  });
+  try {
+    const res = await fetch(`${API_BASE}/path/generate`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ student_id: studentId }) });
+    const data = await res.json();
+    cacheData(`path_${studentId}`, data);
+    return data;
+  } catch { return getCachedData(`path_${studentId}`); }
 }
 
-export async function getTeacherStudents(classCode) {
-  const path = classCode
-    ? `/teacher/students?class_code=${encodeURIComponent(classCode)}`
-    : "/teacher/students";
-  return requestWithCache(path, `teacher_students_${classCode || "all"}`);
+export async function updatePath(studentId) {
+  try {
+    const res = await fetch(`${API_BASE}/path/update`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ student_id: studentId }) });
+    const data = await res.json();
+    cacheData(`path_${studentId}`, data);
+    return data;
+  } catch { return getCachedData(`path_${studentId}`); }
 }
 
-export async function getStudentSyllabus(studentId) {
-  return requestWithCache(
-    `/student/syllabus?studentId=${encodeURIComponent(studentId)}`,
-    `syllabus_${studentId}`
-  );
+export async function generateQuiz(studentId, topicName) {
+  try {
+    const res = await fetch(`${API_BASE}/quiz/generate`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ student_id: studentId, topic_name: topicName }) });
+    const data = await res.json();
+    // Don't cache quizzes so they're always fresh
+    return data;
+  } catch { return getCachedData(`quiz_${topicName}`); }
 }
 
-export async function addStudentModule(payload) {
-  const data = await request("/teacher/add-module", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  localStorage.removeItem(cacheKey(`syllabus_${payload.studentId}`));
-  return data;
-}
-
-export async function removeStudentModule(payload) {
-  const data = await request("/teacher/remove-module", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  localStorage.removeItem(cacheKey(`syllabus_${payload.studentId}`));
-  return data;
-}
-
-export async function getLessonContent({ studentId, standard, subject, chapter }) {
-  return requestWithCache("/content/lesson", `lesson_${studentId}_${subject}_${chapter}`, {
-    method: "POST",
-    body: JSON.stringify({ studentId, standard, subject, chapter }),
-  });
-}
-
-export async function getNotesContent({ studentId, standard, subject, chapter, lesson }) {
-  return requestWithCache("/content/notes", `notes_${studentId}_${subject}_${chapter}`, {
-    method: "POST",
-    body: JSON.stringify({ studentId, standard, subject, chapter, lesson }),
-  });
-}
-
-export async function getQuizContent({ studentId, standard, subject, chapter }) {
-  return requestWithCache("/content/quiz", `quiz_${studentId}_${subject}_${chapter}`, {
-    method: "POST",
-    body: JSON.stringify({ studentId, standard, subject, chapter }),
-  });
+export async function generateLesson(studentId, topicName) {
+  try {
+    const res = await fetch(`${API_BASE}/lesson/generate`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ student_id: studentId, topic_name: topicName }) });
+    const data = await res.json();
+    cacheData(`lesson_${topicName}`, data);
+    return data;
+  } catch { return getCachedData(`lesson_${topicName}`); }
 }
 
 export async function submitQuiz(studentId, topicName, score, answers, questions, timeTaken) {
-  const body = {
-    student_id: studentId,
-    topic_name: topicName,
-    score,
-    answers,
-    questions,
-    time_taken: timeTaken,
-  };
-
+  const body = { student_id: studentId, topic_name: topicName, score, answers, questions };
   try {
-    return await request("/quiz/submit", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    const res = await fetch(`${API_BASE}/quiz/submit`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) });
+    return await res.json();
   } catch {
-    enqueueOfflineAction({ path: "/quiz/submit", method: "POST", body });
-    return {
-      score,
-      status: score >= Math.ceil((questions?.length || 1) * 0.7) ? "strong" : "complete",
-      analysis: null,
-      feedback: {
-        encouragement: "Saved offline. Your result will sync automatically.",
-        focus_next: "You can keep learning with cached lessons, notes, and syllabus.",
-      },
-      offline: true,
-    };
+    queueOfflineAction({ url: '/quiz/submit', method: 'POST', body });
+    return { score, status: score >= 4 ? 'strong' : score < 3 ? 'weak' : 'complete', feedback: null, analysis: null, needs_path_update: false };
   }
 }
 
-export async function sendChatMessage(studentId, message, history) {
-  return request("/chat", {
-    method: "POST",
-    body: JSON.stringify({ student_id: studentId, message, history }),
-  });
+export async function teacherLogin(pin) {
+  const res = await fetch(`${API_BASE}/teacher/login`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ pin }) });
+  if (!res.ok) throw new Error('Invalid PIN');
+  return await res.json();
 }
 
-export function getCachedLearningBundle(studentId, subject, chapter) {
-  return {
-    lesson: readCache(`lesson_${studentId}_${subject}_${chapter}`),
-    notes: readCache(`notes_${studentId}_${subject}_${chapter}`),
-    quiz: readCache(`quiz_${studentId}_${subject}_${chapter}`),
-  };
+export async function getTeacherStudents(classCode) {
+  const url = classCode ? `${API_BASE}/teacher/students?class_code=${encodeURIComponent(classCode)}` : `${API_BASE}/teacher/students`;
+  const res = await fetch(url);
+  return await res.json();
 }
+
+export async function getReEngagement(studentId) {
+  try { const res = await fetch(`${API_BASE}/reengagement/${studentId}`); return await res.json(); } catch { return null; }
+}
+
+export async function getLessonContent(standard, subject, chapter) {
+  const cacheKey = `content_lesson_${standard}_${subject}_${chapter}`;
+  try {
+    const res = await fetch(`${API_BASE}/content/lesson`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ standard, subject, chapter }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to load lesson");
+    }
+    const data = await res.json();
+    cacheData(cacheKey, data);
+    return data;
+  } catch {
+    return getCachedData(cacheKey);
+  }
+}
+
+export async function getNotesContent(standard, subject, chapter) {
+  const cacheKey = `content_notes_${standard}_${subject}_${chapter}`;
+  try {
+    const res = await fetch(`${API_BASE}/content/notes`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ standard, subject, chapter }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to load notes");
+    }
+    const data = await res.json();
+    cacheData(cacheKey, data);
+    return data;
+  } catch {
+    return getCachedData(cacheKey);
+  }
+}
+
+export async function getQuizContent(standard, subject, chapter) {
+  const cacheKey = `content_quiz_${standard}_${subject}_${chapter}`;
+  try {
+    const res = await fetch(`${API_BASE}/content/quiz`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ standard, subject, chapter }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to load quiz");
+    }
+    const data = await res.json();
+    cacheData(cacheKey, data);
+    return data;
+  } catch {
+    return getCachedData(cacheKey);
+  }
+}
+
+// ===== TEACHER-ASSIGNED PATHS =====
+export async function assignPathToStudent(teacherId, studentId, title, topics) {
+  const res = await fetch(`${API_BASE}/assigned-paths/assign`, {
+    method: 'POST', headers: getHeaders(),
+    body: JSON.stringify({ teacher_id: teacherId, student_id: studentId, title, topics }),
+  });
+  if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to assign path'); }
+  return await res.json();
+}
+
+export async function getAssignedPaths(studentId) {
+  const cacheKey = `assigned_paths_${studentId}`;
+  try {
+    const res = await fetch(`${API_BASE}/assigned-paths/student/${studentId}`);
+    if (!res.ok) throw new Error('Failed to fetch');
+    const data = await res.json();
+    cacheData(cacheKey, data);
+    return data;
+  } catch { return getCachedData(cacheKey) || []; }
+}
+
+export async function getAssignedTopicContent(pathId, topicIndex) {
+  const cacheKey = `assigned_content_${pathId}_${topicIndex}`;
+  try {
+    const res = await fetch(`${API_BASE}/assigned-paths/content/${pathId}/${topicIndex}`);
+    if (!res.ok) throw new Error('Failed to fetch');
+    const data = await res.json();
+    cacheData(cacheKey, data);
+    return data;
+  } catch { return getCachedData(cacheKey); }
+}
+
+// ===== TEACHER ANALYTICS =====
+export async function getTeacherQuizScores(classCode) {
+  const url = classCode
+    ? `${API_BASE}/teacher/quiz-scores?class_code=${encodeURIComponent(classCode)}`
+    : `${API_BASE}/teacher/quiz-scores`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch');
+    return await res.json();
+  } catch { return { scores: [], student_count: 0 }; }
+}
+
+export async function generateTeacherAIReport(classCode) {
+  const res = await fetch(`${API_BASE}/teacher/ai-report`, {
+    method: 'POST', headers: getHeaders(),
+    body: JSON.stringify({ class_code: classCode }),
+  });
+  if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to generate report'); }
+  return await res.json();
+}
+
+export function getSavedStudentId() { return localStorage.getItem('pw_student_id'); }
+export function getLanguage() { return localStorage.getItem('pw_language') || 'en'; }
+export function setLanguage(lang) { localStorage.setItem('pw_language', lang); }

@@ -9,7 +9,7 @@ const router = Router();
 router.post('/generate', async (req, res) => {
   try {
     const { student_id } = req.body;
-    const student = getOne('SELECT * FROM students WHERE id = ?', [student_id]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [student_id]);
     
     if (!student) {
       return res.status(404).json({ error: 'Student not found' });
@@ -30,12 +30,12 @@ router.post('/generate', async (req, res) => {
     }
 
     // Save to database
-    const result = runSQL('INSERT INTO learning_paths (student_id, path_json) VALUES (?, ?)', [student_id, JSON.stringify(topics)]);
+    const result = await runSQL('INSERT INTO learning_paths (student_id, path_json) VALUES (?, ?)', [student_id, JSON.stringify(topics)]);
     const pathId = result.lastInsertRowid;
 
     // Initialize topic progress entries
     for (const topic of topics) {
-      runSQL('INSERT INTO topic_progress (student_id, path_id, topic_name, status) VALUES (?, ?, ?, ?)',
+      await runSQL('INSERT INTO topic_progress (student_id, path_id, topic_name, status) VALUES (?, ?, ?, ?)',
         [student_id, pathId, topic.topic, 'pending']);
     }
 
@@ -54,13 +54,13 @@ router.post('/generate', async (req, res) => {
 router.post('/update', async (req, res) => {
   try {
     const { student_id } = req.body;
-    const student = getOne('SELECT * FROM students WHERE id = ?', [student_id]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [student_id]);
     
     if (!student) {
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    const progress = getAll('SELECT * FROM topic_progress WHERE student_id = ?', [student_id]);
+    const progress = await getAll('SELECT * FROM topic_progress WHERE student_id = ?', [student_id]);
     
     const completedTopics = progress.filter(p => ['complete', 'strong', 'weak'].includes(p.status)).map(p => p.topic_name);
     const weakAreas = progress.filter(p => p.status === 'weak').map(p => p.topic_name);
@@ -82,14 +82,14 @@ router.post('/update', async (req, res) => {
       ? `Revisiting weak areas: ${weakAreas.join(', ')}`
       : 'Path updated based on your progress';
 
-    const result = runSQL('INSERT INTO learning_paths (student_id, path_json, update_reason) VALUES (?, ?, ?)',
+    const result = await runSQL('INSERT INTO learning_paths (student_id, path_json, update_reason) VALUES (?, ?, ?)',
       [student_id, JSON.stringify(topics), reason]);
     const pathId = result.lastInsertRowid;
 
     for (const topic of topics) {
-      const existing = getOne('SELECT id FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student_id, topic.topic]);
+      const existing = await getOne('SELECT id FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student_id, topic.topic]);
       if (!existing) {
-        runSQL('INSERT INTO topic_progress (student_id, path_id, topic_name, status) VALUES (?, ?, ?, ?)',
+        await runSQL('INSERT INTO topic_progress (student_id, path_id, topic_name, status) VALUES (?, ?, ?, ?)',
           [student_id, pathId, topic.topic, 'pending']);
       }
     }

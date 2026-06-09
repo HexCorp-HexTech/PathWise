@@ -1,6 +1,14 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+dotenv.config();
+dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '.env') });
+
 import express from 'express';
 import cors from 'cors';
 import './db.js';
+import { getDatabaseStatus } from './db.js';
 
 const app = express();
 const PORT = 3001;
@@ -10,7 +18,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // Health endpoint for connectivity check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: Date.now() });
+  res.json({ status: 'ok', timestamp: Date.now(), database: getDatabaseStatus() });
 });
 
 // Import routes
@@ -21,9 +29,9 @@ import quizRoutes from './routes/quiz.js';
 import teacherRoutes from './routes/teacher.js';
 import reengagementRoutes from './routes/reengagement.js';
 import lessonRoutes from './routes/lesson.js';
-import chatRoutes from './routes/chatApi.js';
+import chatRoutes from './routes/chat.js';
 import contentRoutes from './routes/content.js';
-import syllabusRoutes from './routes/syllabus.js';
+import assignedPathsRoutes from './routes/assignedPaths.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
@@ -34,7 +42,12 @@ app.use('/api/reengagement', reengagementRoutes);
 app.use('/api/lesson', lessonRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/content', contentRoutes);
-app.use('/api', syllabusRoutes);
+app.use('/api/assigned-paths', assignedPathsRoutes);
+
+app.use('/api', (err, req, res, next) => {
+  console.error('API error:', err);
+  res.status(500).json({ error: err.message || 'Server error' });
+});
 
 // Vercel doesn't use app.listen, it intercepts exports
 const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;

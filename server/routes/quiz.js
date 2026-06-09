@@ -9,11 +9,11 @@ const router = Router();
 router.post('/generate', async (req, res) => {
   try {
     const { student_id, topic_name } = req.body;
-    const student = getOne('SELECT * FROM students WHERE id = ?', [student_id]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [student_id]);
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
     // Get student's past weak concepts for this topic to focus on them
-    const pastProgress = getOne('SELECT weak_concepts, attempts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student_id, topic_name]);
+    const pastProgress = await getOne('SELECT weak_concepts, attempts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student_id, topic_name]);
     const pastWeak = pastProgress?.weak_concepts ? JSON.parse(pastProgress.weak_concepts) : [];
     const attemptCount = pastProgress?.attempts || 0;
 
@@ -40,17 +40,15 @@ router.post('/generate', async (req, res) => {
 router.post('/submit', async (req, res) => {
   try {
     const { student_id, topic_name, score, answers, questions } = req.body;
-    const student = getOne('SELECT * FROM students WHERE id = ?', [student_id]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [student_id]);
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
-    const path = getOne('SELECT * FROM learning_paths WHERE student_id = ? ORDER BY generated_at DESC', [student_id]);
-    const totalQuestions = Array.isArray(questions) && questions.length > 0 ? questions.length : 5;
-    const percentage = Math.round((score / totalQuestions) * 100);
-    const status = percentage >= 80 ? 'strong' : percentage >= 50 ? 'complete' : 'weak';
+    const path = await getOne('SELECT * FROM learning_paths WHERE student_id = ? ORDER BY generated_at DESC', [student_id]);
+    const status = score >= 4 ? 'strong' : score >= 3 ? 'complete' : 'weak';
     const isHindi = student.language === 'hi';
 
     // Get all weak areas for context
-    const weakTopics = getAll("SELECT topic_name FROM topic_progress WHERE student_id = ? AND status = 'weak'", [student_id]);
+    const weakTopics = await getAll("SELECT topic_name FROM topic_progress WHERE student_id = ? AND status = 'weak'", [student_id]);
     const weakAreas = weakTopics.map(t => t.topic_name);
 
     // Generate AI feedback
@@ -64,8 +62,8 @@ router.post('/submit', async (req, res) => {
 
     // Build detailed analysis with per-student weakness tracking
     const analysis = {
-      score, total: totalQuestions,
-      percentage,
+      score, total: 5,
+      percentage: Math.round((score / 5) * 100),
       status, topic: topic_name,
       board: student.board || 'CBSE',
       grade: student.grade,
@@ -122,31 +120,31 @@ router.post('/submit', async (req, res) => {
     }
 
     // Save progress with per-student weak concepts
-    const existing = getOne('SELECT id, attempts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student_id, topic_name]);
+    const existing = await getOne('SELECT id, attempts FROM topic_progress WHERE student_id = ? AND topic_name = ?', [student_id, topic_name]);
     if (existing) {
-      runSQL("UPDATE topic_progress SET status = ?, quiz_score = ?, feedback = ?, weak_concepts = ?, attempts = ?, last_attempt = datetime('now') WHERE id = ?",
+      await runSQL("UPDATE topic_progress SET status = ?, quiz_score = ?, feedback = ?, weak_concepts = ?, attempts = ?, last_attempt = datetime('now') WHERE id = ?",
         [status, score, JSON.stringify(feedback), JSON.stringify(weakConcepts), (existing.attempts || 0) + 1, existing.id]);
     } else {
-      runSQL("INSERT INTO topic_progress (student_id, topic_name, status, quiz_score, feedback, weak_concepts, attempts, last_attempt) VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))",
+      await runSQL("INSERT INTO topic_progress (student_id, topic_name, status, quiz_score, feedback, weak_concepts, attempts, last_attempt) VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))",
         [student_id, topic_name, status, score, JSON.stringify(feedback), JSON.stringify(weakConcepts)]);
     }
 
     // Update streak and last active
     try {
-      runSQL("UPDATE students SET last_active = datetime('now'), streak_count = streak_count + 1 WHERE id = ?", [student_id]);
+      await runSQL("UPDATE students SET last_active = datetime('now'), streak_count = streak_count + 1 WHERE id = ?", [student_id]);
     } catch(e) {}
 
     // Update student progress percentage
-    const allTopics = getAll('SELECT status FROM topic_progress WHERE student_id = ?', [student_id]);
+    const allTopics = await getAll('SELECT status FROM topic_progress WHERE student_id = ?', [student_id]);
     const completed = allTopics.filter(t => ['complete', 'strong'].includes(t.status)).length;
     const pathTopics = path ? JSON.parse(path.path_json || '[]').length : allTopics.length;
     const progressPct = pathTopics > 0 ? Math.round((completed / pathTopics) * 100) : 0;
     try {
-      runSQL('UPDATE students SET progress_percent = ? WHERE id = ?', [progressPct, student_id]);
+      await runSQL('UPDATE students SET progress_percent = ? WHERE id = ?', [progressPct, student_id]);
     } catch(e) {}
 
     // Check if path needs update (3+ weak)
-    const totalWeak = getAll("SELECT COUNT(*) as cnt FROM topic_progress WHERE student_id = ? AND status = 'weak'", [student_id]);
+    const totalWeak = await getAll("SELECT COUNT(*) as cnt FROM topic_progress WHERE student_id = ? AND status = 'weak'", [student_id]);
     const needsUpdate = (totalWeak[0]?.cnt || 0) >= 3;
 
     res.json({
@@ -161,9 +159,9 @@ router.post('/submit', async (req, res) => {
 });
 
 // Get per-student weakness for a specific topic
-router.get('/weakness/:student_id/:topic', (req, res) => {
+router.get('/weakness/:student_id/:topic', async (req, res) => {
   try {
-    const progress = getOne('SELECT weak_concepts, quiz_score, attempts, status FROM topic_progress WHERE student_id = ? AND topic_name = ?',
+    const progress = await getOne('SELECT weak_concepts, quiz_score, attempts, status FROM topic_progress WHERE student_id = ? AND topic_name = ?',
       [req.params.student_id, req.params.topic]);
     if (!progress) return res.json({ weaknesses: [], attempts: 0 });
     
@@ -179,9 +177,9 @@ router.get('/weakness/:student_id/:topic', (req, res) => {
 });
 
 // Get all weaknesses for a student (across all topics)
-router.get('/weaknesses/:student_id', (req, res) => {
+router.get('/weaknesses/:student_id', async (req, res) => {
   try {
-    const all = getAll("SELECT topic_name, weak_concepts, quiz_score, attempts FROM topic_progress WHERE student_id = ? AND status = 'weak'",
+    const all = await getAll("SELECT topic_name, weak_concepts, quiz_score, attempts FROM topic_progress WHERE student_id = ? AND status = 'weak'",
       [req.params.student_id]);
     
     const weaknesses = all.map(t => ({

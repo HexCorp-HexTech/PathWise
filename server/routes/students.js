@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { runSQL, getOne, getAll } from '../db.js';
 import { generatePath, isAIAvailable } from '../claude.js';
 import { localGeneratePath } from '../localAI.js';
+import { hashPassword, withoutPassword } from '../authUtils.js';
 
 const router = Router();
 
@@ -12,24 +13,25 @@ router.post('/', async (req, res) => {
 
     // If id provided, update existing student profile
     if (id) {
-      runSQL(
+      await runSQL(
         `UPDATE students SET name=?, age=?, grade=?, board=?, goals=?, level=?, study_time=?, language=?, device_type=?, connectivity=?, last_active_date=datetime('now')
          WHERE id=?`,
         [name, age, grade, board || 'CBSE', goals, level, study_time, language, device_type || 'mobile', connectivity || '3g', id]
       );
-      const student = getOne('SELECT * FROM students WHERE id = ?', [id]);
-      return res.json({ ...student, password: undefined });
+      const student = await getOne('SELECT * FROM students WHERE id = ?', [id]);
+      return res.json(withoutPassword(student));
     }
 
     // Legacy: create without auth (backward compat)
-    const result = runSQL(
+    const passwordHash = await hashPassword('1234');
+    const result = await runSQL(
       `INSERT INTO students (username, password, name, age, grade, board, goals, level, study_time, language, device_type, connectivity, last_active_date)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [`student_${Date.now()}`, '1234', name, age, grade, board || 'CBSE', goals, level, study_time, language, device_type || 'mobile', connectivity || '3g']
+      [`student_${Date.now()}`, passwordHash, name, age, grade, board || 'CBSE', goals, level, study_time, language, device_type || 'mobile', connectivity || '3g']
     );
 
-    const student = getOne('SELECT * FROM students WHERE id = ?', [result.lastInsertRowid]);
-    res.status(201).json({ ...student, password: undefined });
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [result.lastInsertRowid]);
+    res.status(201).json(withoutPassword(student));
   } catch (err) {
     console.error('Error creating student:', err);
     res.status(500).json({ error: 'Failed to create student' });
@@ -37,13 +39,13 @@ router.post('/', async (req, res) => {
 });
 
 // Get student with path and progress
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const student = getOne('SELECT * FROM students WHERE id = ?', [parseInt(req.params.id)]);
+    const student = await getOne('SELECT * FROM students WHERE id = ?', [parseInt(req.params.id)]);
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
-    const currentPath = getOne('SELECT * FROM learning_paths WHERE student_id = ? ORDER BY generated_at DESC', [student.id]);
-    const progress = getAll('SELECT * FROM topic_progress WHERE student_id = ?', [student.id]);
+    const currentPath = await getOne('SELECT * FROM learning_paths WHERE student_id = ? ORDER BY generated_at DESC', [student.id]);
+    const progress = await getAll('SELECT * FROM topic_progress WHERE student_id = ?', [student.id]);
 
     // Check re-engagement
     let needsReengagement = false;
@@ -53,8 +55,7 @@ router.get('/:id', (req, res) => {
     }
 
     res.json({
-      ...student,
-      password: undefined,
+      ...withoutPassword(student),
       current_path: currentPath ? {
         id: currentPath.id,
         generated_at: currentPath.generated_at,
