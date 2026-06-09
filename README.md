@@ -1,6 +1,6 @@
-# PathWise 🎓 — Adaptive Learning Platform
+# VidhyaPath 🎓 — Adaptive Learning Platform
 
-PathWise is an AI-powered adaptive learning application natively supporting CBSE, ICSE, and Indian State Boards curriculums. By dynamically tracking student strengths, weaknesses, and preferred learning styles, the system directly tailors their quizzes and chapter notes using Google Gemini 2.0 Flash context-aligned AI generation. 
+VidhyaPath is an AI-powered adaptive learning application natively supporting CBSE, ICSE, and Indian State Boards curriculums. By dynamically tracking student strengths, weaknesses, and preferred learning styles, the system directly tailors their quizzes and chapter notes using Google Gemini 2.0 Flash context-aligned AI generation. 
 
 ## Key Features
 * 🧠 **Omni-AI Study Path**: Detailed conceptual notes and dynamically scaling quizzes individually tailored against a student's previous missed questions.
@@ -36,7 +36,7 @@ PathWise is an AI-powered adaptive learning application natively supporting CBSE
 ## Development & Usage Notes
 - The default host is set to `http://localhost:5173` pointing to API endpoints strictly at `:3001/api`.
 - You can create your own Teacher Profile via the onboarding sequence and assign specific student groups distinct "Class Codes" (e.g. `MATH-CLASS-5A`).
-- The entire `server/pathwise.db` is ephemeral but tracked locally for high-speed persistence across reloads. 
+- The entire `server/VidhyaPath.db` is ephemeral but tracked locally for high-speed persistence across reloads. 
 
 
 ## Team HexCorp
