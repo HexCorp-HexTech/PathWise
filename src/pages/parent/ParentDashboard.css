@@ -1,0 +1,32 @@
+/* Parent Dashboard Styles */
+.pdash { padding: var(--sp-6); max-width: 700px; margin: 0 auto; }
+.pdash__header { margin-bottom: var(--sp-6); }
+.pdash__header h1 { font-size: var(--fs-h1); font-weight: var(--fw-extrabold); margin-bottom: var(--sp-1); }
+.pdash__header p { font-size: var(--fs-body-sm); color: var(--color-text-secondary); }
+
+.pdash__stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-6); }
+
+.pdash__chart-card { margin-bottom: var(--sp-6); }
+.pdash__chart-card h3 { font-size: var(--fs-body-sm); font-weight: var(--fw-bold); margin-bottom: var(--sp-4); }
+.pdash__chart { display: flex; gap: var(--sp-3); align-items: flex-end; height: 160px; }
+.pdash__chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); height: 100%; }
+.pdash__chart-bar-track { flex: 1; width: 100%; max-width: 40px; background: var(--color-surface-overlay); border-radius: var(--radius-sm); display: flex; align-items: flex-end; overflow: hidden; }
+.pdash__chart-bar { width: 100%; background: var(--color-primary); border-radius: var(--radius-sm); transition: height 0.8s var(--ease-out); min-height: 4px; }
+.pdash__chart-label { font-size: var(--fs-overline); color: var(--color-text-tertiary); font-weight: var(--fw-semibold); }
+
+.pdash__sw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: var(--sp-6); }
+.pdash__sw-title { font-size: var(--fs-body-sm); font-weight: var(--fw-bold); margin-bottom: var(--sp-3); }
+.pdash__sw-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.pdash__sw-list li { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-body-sm); color: var(--color-text-secondary); }
+
+.pdash__subjects { margin-bottom: var(--sp-6); }
+.pdash__subjects h3 { font-size: var(--fs-body-sm); font-weight: var(--fw-bold); margin-bottom: var(--sp-4); }
+.pdash__subject-row { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.pdash__subject-name { font-size: var(--fs-body-sm); font-weight: var(--fw-medium); min-width: 120px; }
+.pdash__subject-pct { font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--color-text-secondary); min-width: 36px; text-align: right; }
+
+@media (max-width: 768px) {
+  .pdash { padding: var(--sp-4); }
+  .pdash__stats { grid-template-columns: 1fr 1fr; }
+  .pdash__sw-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,303 @@
+/* ============================================
+   VIDYA AI — Doubt Room Styles (Shared)
+   ============================================ */
+.doubts-page {
+  padding: var(--sp-6);
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.doubts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.doubts-header h1 {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-extrabold);
+  margin-bottom: var(--sp-1);
+}
+
+/* Post New Doubt Card */
+.post-doubt-card {
+  padding: var(--sp-6);
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.post-doubt-card h3 {
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-bold);
+  margin-bottom: var(--sp-4);
+}
+
+.post-doubt-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.post-doubt-form__row {
+  display: grid;
+  grid-template-cols: 1fr 1fr;
+  gap: var(--sp-4);
+}
+
+@media (max-width: 600px) {
+  .post-doubt-form__row {
+    grid-template-cols: 1fr;
+  }
+}
+
+.post-doubt-form__select, .post-doubt-form__textarea {
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  outline: none;
+  font-family: inherit;
+  font-size: var(--fs-body-sm);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.post-doubt-form__select:focus, .post-doubt-form__textarea:focus {
+  border-color: var(--color-primary);
+}
+
+.post-doubt-form__textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.post-doubt-form__options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--sp-2);
+}
+
+.post-doubt-form__ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-secondary);
+}
+
+/* Doubts List & Layout */
+.doubts-layout {
+  display: grid;
+  grid-template-cols: 1fr;
+  gap: var(--sp-6);
+}
+
+.doubt-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.doubt-item {
+  padding: var(--sp-5);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.doubt-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.doubt-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--sp-3);
+}
+
+.doubt-item__author {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.doubt-item__avatar {
+  font-size: 24px;
+}
+
+.doubt-item__name {
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body-sm);
+}
+
+.doubt-item__time {
+  font-size: var(--fs-caption);
+  color: var(--color-text-tertiary);
+}
+
+.doubt-item__tags {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.doubt-item__status {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+}
+
+.doubt-item__status--open {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.doubt-item__status--answered {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.doubt-item__status--closed {
+  background: var(--color-surface-bg);
+  color: var(--color-text-tertiary);
+}
+
+.doubt-item__subject {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-bg);
+  color: var(--color-text-secondary);
+}
+
+.doubt-item__question {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-primary);
+  margin-bottom: var(--sp-4);
+  white-space: pre-wrap;
+}
+
+.doubt-item__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--sp-3);
+}
+
+/* Detail view / replies thread drawer */
+.doubt-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-6);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-card);
+}
+
+.doubt-detail__back {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+
+.doubt-detail__back:hover {
+  color: var(--color-text-primary);
+}
+
+.doubt-replies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+
+.doubt-reply {
+  padding: var(--sp-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+}
+
+.doubt-reply--ai {
+  border-color: rgba(200, 0, 24, 0.2);
+  background: var(--color-primary-surface);
+}
+
+.doubt-reply__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-2);
+}
+
+.doubt-reply__author {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body-sm);
+}
+
+.doubt-reply__ai-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-caption);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-full);
+}
+
+.doubt-reply__content {
+  font-size: var(--fs-body-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+}
+
+.reply-input-area {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+
+.reply-input {
+  flex: 1;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  outline: none;
+  font-family: inherit;
+  font-size: var(--fs-body-sm);
+}
+
+.reply-input:focus {
+  border-color: var(--color-primary);
+}

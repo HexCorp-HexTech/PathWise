@@ -1,0 +1,52 @@
+/* Settings Styles */
+.settings-page { padding: var(--sp-6); max-width: 600px; margin: 0 auto; }
+.settings-title { font-size: var(--fs-h2); font-weight: var(--fw-extrabold); margin-bottom: var(--sp-6); }
+
+.settings-profile {
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-4) !important; margin-bottom: var(--sp-6);
+}
+.settings-profile__avatar { font-size: 40px; }
+.settings-profile__info { flex: 1; }
+.settings-profile__info h3 { font-size: var(--fs-body); font-weight: var(--fw-bold); }
+.settings-profile__info p { font-size: var(--fs-caption); color: var(--color-text-secondary); }
+.settings-profile__edit {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-caption); font-weight: var(--fw-semibold);
+  color: var(--color-primary); cursor: pointer;
+  background: none; border: none;
+}
+
+.settings-section { margin-bottom: var(--sp-5); }
+.settings-section__title {
+  font-size: var(--fs-caption); font-weight: var(--fw-bold);
+  color: var(--color-text-tertiary); text-transform: uppercase;
+  letter-spacing: var(--ls-wide); margin-bottom: var(--sp-2);
+}
+
+.settings-item {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); width: 100%;
+  cursor: pointer; transition: background var(--dur-fast);
+  border-bottom: 1px solid var(--color-border);
+  background: none; border-left: none; border-right: none; border-top: none;
+  text-align: left; color: var(--color-text);
+}
+.settings-item:last-child { border-bottom: none; }
+.settings-item:hover { background: var(--color-surface-hover); }
+.settings-item__icon { color: var(--color-text-secondary); flex-shrink: 0; }
+.settings-item__label { flex: 1; font-size: var(--fs-body-sm); font-weight: var(--fw-medium); }
+.settings-item__value { font-size: var(--fs-body-sm); color: var(--color-text-tertiary); }
+.settings-item__chevron { color: var(--color-text-tertiary); flex-shrink: 0; }
+
+.settings-logout {
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  width: 100%; padding: var(--sp-3); margin-top: var(--sp-4);
+  border-radius: var(--radius-md); color: var(--color-error);
+  font-size: var(--fs-body-sm); font-weight: var(--fw-semibold);
+  cursor: pointer; background: var(--color-error-light);
+  border: 1px solid transparent; transition: all var(--dur-fast);
+}
+.settings-logout:hover { border-color: var(--color-error); }
+
+@media (max-width: 768px) { .settings-page { padding: var(--sp-4); } }

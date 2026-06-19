@@ -1,0 +1,185 @@
+/* ============================================
+   VIDYA AI — Gyani Mascot Styles & Animations
+   ============================================ */
+
+.gyani-mascot-container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gyani-mascot {
+  width: 120px;
+  height: 120px;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15));
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.gyani-mascot--sm {
+  width: 60px;
+  height: 60px;
+}
+
+.gyani-mascot--lg {
+  width: 180px;
+  height: 180px;
+}
+
+/* Animations */
+.gyani-mascot .body {
+  animation: gyani-float 4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.gyani-mascot .head {
+  animation: gyani-head-bob 4s ease-in-out infinite;
+  transform-origin: center 60px;
+}
+
+.gyani-mascot .eye-left,
+.gyani-mascot .eye-right {
+  animation: gyani-blink 6s ease-in-out infinite;
+  transform-origin: 40px 50px;
+}
+
+.gyani-mascot .eye-right {
+  transform-origin: 80px 50px;
+}
+
+.gyani-mascot .wing-left {
+  transform-origin: 25px 65px;
+}
+
+.gyani-mascot .wing-right {
+  transform-origin: 95px 65px;
+}
+
+/* State-specific Animations */
+
+/* Celebrating State */
+.gyani-mascot--celebrating {
+  animation: gyani-bounce 1s ease-in-out infinite;
+}
+
+.gyani-mascot--celebrating .wing-left {
+  animation: gyani-wing-wave-left 0.5s ease-in-out infinite alternate;
+}
+
+.gyani-mascot--celebrating .wing-right {
+  animation: gyani-wing-wave-right 0.5s ease-in-out infinite alternate;
+}
+
+/* Thinking State */
+.gyani-mascot--thinking .head {
+  animation: gyani-head-tilt 2s ease-in-out infinite alternate;
+}
+
+.gyani-mascot--thinking .eye-left,
+.gyani-mascot--thinking .eye-right {
+  animation: gyani-squint 2s ease-in-out infinite alternate;
+}
+
+/* Confused State */
+.gyani-mascot--confused .head {
+  transform: rotate(-8deg);
+  animation: gyani-jitter 0.5s ease-in-out infinite;
+}
+
+.gyani-mascot--confused .eye-left {
+  transform: scaleY(0.7);
+}
+
+.gyani-mascot--confused .eye-right {
+  transform: scaleY(1.2);
+}
+
+/* Speech Bubble styling */
+.gyani-bubble {
+  background: var(--color-surface-card);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-3) var(--sp-4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  max-width: 280px;
+  position: relative;
+  animation: gyani-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  color: var(--color-text-primary);
+  font-size: var(--fs-body-sm);
+  line-height: 1.5;
+  font-weight: var(--fw-medium);
+}
+
+.gyani-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 14px;
+  height: 14px;
+  background: var(--color-surface-card);
+  border-right: 2px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.gyani-bubble--left::after {
+  left: -8px;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%) rotate(135deg);
+}
+
+/* Keyframes */
+@keyframes gyani-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes gyani-head-bob {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(2px) rotate(1deg); }
+}
+
+@keyframes gyani-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes gyani-wing-wave-left {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-45deg) translateY(-5px); }
+}
+
+@keyframes gyani-wing-wave-right {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(45deg) translateY(-5px); }
+}
+
+@keyframes gyani-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes gyani-head-tilt {
+  0% { transform: rotate(-5deg); }
+  100% { transform: rotate(10deg); }
+}
+
+@keyframes gyani-squint {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.6); }
+}
+
+@keyframes gyani-jitter {
+  0%, 100% { transform: translate(0, 0) rotate(-8deg); }
+  25% { transform: translate(-1px, 1px) rotate(-9deg); }
+  75% { transform: translate(1px, -1px) rotate(-7deg); }
+}
+
+@keyframes gyani-pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}

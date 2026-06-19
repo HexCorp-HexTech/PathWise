@@ -1,0 +1,181 @@
+/* ============================================
+   VIDYA AI — Teacher Student Directory Styles
+   ============================================ */
+.tstudents {
+  padding: var(--sp-6);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tstudents__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-6);
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.tstudents__filters {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-6);
+}
+
+.tstudents__search {
+  flex: 1;
+  min-width: 250px;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.tstudents__search:focus {
+  border-color: var(--color-primary);
+}
+
+.tstudents__select {
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+/* Students Grid */
+.tstudents__grid {
+  display: grid;
+  grid-template-cols: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-8);
+}
+
+.student-card {
+  padding: var(--sp-5);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.student-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.student-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.student-card__avatar {
+  font-size: 32px;
+  background: var(--color-surface-bg);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+}
+
+.student-card__name {
+  font-weight: var(--fw-extrabold);
+  font-size: var(--fs-body);
+}
+
+.student-card__risk {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+.student-card__risk--high {
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
+
+.student-card__risk--medium {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.student-card__risk--low {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.student-card__stats {
+  display: grid;
+  grid-template-cols: 1fr 1fr;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  font-size: var(--fs-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Detail panel */
+.student-detail-panel {
+  display: grid;
+  grid-template-cols: 1fr;
+  gap: var(--sp-6);
+  margin-top: var(--sp-6);
+}
+
+.student-detail-card {
+  padding: var(--sp-6);
+}
+
+.student-detail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+
+.student-detail__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.student-detail__name {
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-extrabold);
+}
+
+.student-detail__subject-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-3);
+  font-size: var(--fs-body-sm);
+}
+
+.student-detail__subject-label {
+  font-weight: var(--fw-semibold);
+  width: 100px;
+}
+
+.student-detail__subject-progress {
+  flex: 1;
+  margin: 0 var(--sp-4);
+}
+
+.student-detail__subject-val {
+  font-weight: var(--fw-bold);
+  width: 40px;
+  text-align: right;
+}

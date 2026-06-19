@@ -1,0 +1,200 @@
+/* ============================================
+   VIDYA AI — Student Flashcards Styles
+   ============================================ */
+.flashcards-page {
+  padding: var(--sp-6);
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+.flashcards-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-6);
+}
+
+.flashcards-header__back {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.flashcards-header__back:hover {
+  color: var(--color-text-primary);
+  background: var(--color-border);
+}
+
+.flashcards-header__title {
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-extrabold);
+}
+
+/* Card Stack & Perspective Container */
+.flashcard-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: var(--sp-6) 0 var(--sp-8) 0;
+  perspective: 1000px;
+  min-height: 320px;
+}
+
+.flashcard {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform var(--duration-slow) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flashcard--flipped {
+  transform: rotateY(180deg);
+}
+
+.flashcard__face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  border: 2px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.flashcard__face--front {
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+}
+
+.flashcard__face--back {
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  transform: rotateY(180deg);
+}
+
+.flashcard__badge {
+  position: absolute;
+  top: var(--sp-4);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-overline);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.flashcard__content {
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-bold);
+  line-height: var(--line-height-relaxed);
+}
+
+.flashcard__face--back .flashcard__content {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  white-space: pre-line;
+}
+
+.flashcard__instruction {
+  position: absolute;
+  bottom: var(--sp-4);
+  font-size: var(--fs-caption);
+  color: var(--color-text-tertiary);
+  font-weight: var(--fw-semibold);
+}
+
+/* Quality buttons layout */
+.quality-actions {
+  display: flex;
+  gap: var(--sp-3);
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.quality-btn {
+  flex: 1;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-card);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.quality-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.quality-btn__label {
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-bold);
+}
+
+.quality-btn__desc {
+  font-size: var(--fs-caption);
+  color: var(--color-text-tertiary);
+}
+
+/* Specific colors for ratings */
+.quality-btn--again:hover {
+  border-color: #E74C3C;
+  background: rgba(231, 76, 60, 0.05);
+}
+.quality-btn--again:hover .quality-btn__label {
+  color: #E74C3C;
+}
+
+.quality-btn--hard:hover {
+  border-color: #E67E22;
+  background: rgba(230, 126, 34, 0.05);
+}
+.quality-btn--hard:hover .quality-btn__label {
+  color: #E67E22;
+}
+
+.quality-btn--good:hover {
+  border-color: #2ECC71;
+  background: rgba(46, 204, 113, 0.05);
+}
+.quality-btn--good:hover .quality-btn__label {
+  color: #2ECC71;
+}
+
+.quality-btn--easy:hover {
+  border-color: #3498DB;
+  background: rgba(52, 152, 219, 0.05);
+}
+.quality-btn--easy:hover .quality-btn__label {
+  color: #3498DB;
+}

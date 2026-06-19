@@ -1,0 +1,109 @@
+/* Card Component Styles */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  transition: all var(--dur-normal) var(--ease-out);
+}
+
+.card--pad-none { padding: 0; }
+.card--pad-sm { padding: var(--sp-3); }
+.card--pad-md { padding: var(--sp-4); }
+.card--pad-lg { padding: var(--sp-6); }
+
+.card--default {
+  background: var(--color-surface);
+}
+
+.card--elevated {
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+  border-color: transparent;
+}
+
+.card--glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-color: var(--glass-border);
+}
+
+.card--outlined {
+  background: transparent;
+  border-color: var(--color-border);
+}
+
+.card--interactive {
+  background: var(--color-surface-raised);
+  border-color: transparent;
+}
+
+.card--clickable {
+  cursor: pointer;
+}
+.card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+.card--clickable:active {
+  transform: translateY(0);
+}
+
+/* Stat Card */
+.stat-card {
+  min-width: 140px;
+}
+
+.stat-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-2);
+}
+
+.stat-card__label {
+  font-size: var(--fs-caption);
+  color: var(--color-text-secondary);
+  font-weight: var(--fw-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+}
+
+.stat-card__icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-overlay);
+}
+
+.stat-card__value {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-extrabold);
+  color: var(--color-text);
+  line-height: 1;
+  margin-bottom: var(--sp-1);
+}
+
+.stat-card__change {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.stat-card__change--up {
+  color: var(--color-success);
+  background: var(--color-success-light);
+}
+
+.stat-card__change--down {
+  color: var(--color-error);
+  background: var(--color-error-light);
+}
