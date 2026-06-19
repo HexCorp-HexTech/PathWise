@@ -23,8 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# profile
+# profile files
 .env
 better.tar
 Pathwise.zip
 VidyaPath_Mission_Briefing_(4).pptx
+tfg
