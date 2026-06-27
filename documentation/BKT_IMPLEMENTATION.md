@@ -1,4 +1,4 @@
-# Pathwise — Bayesian Knowledge Tracing (BKT) Model
+# PathWise — Bayesian Knowledge Tracing (BKT) Model
 
 Bayesian Knowledge Tracing (BKT) is a machine learning algorithm used to model a student's cognitive mastery of specific skills or concept tags over time. This guide covers the mathematical framework, calibration profiles, and system code implementations in Pathwise.
 
@@ -43,7 +43,7 @@ $$P(L_t) = P(L_{t-1} | \text{Obs}) + (1 - P(L_{t-1} | \text{Obs})) \cdot P(T)$$
 
 ## 3. Code Implementation
 
-The math is executed in [bkt.ts](file:///c:/Users/Arnav/OneDrive/Desktop/better/src/lib/bkt.ts):
+The math is executed in [`src/lib/bkt.ts`](../src/lib/bkt.ts):
 
 ```typescript
 import type { BKTMastery } from '../types';

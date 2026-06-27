@@ -1,4 +1,4 @@
-# Pathwise — Content Compilation & AI Tutor Solver Pipeline
+# PathWise — AI Content Pipeline & Solver
 
 Pathwise implements a deterministic curriculum intelligence pipeline. Instead of relying on raw runtime AI generation which can produce generic questions, placeholder formulas, or conversational evasion, Pathwise compiles outputs from a curated static **Knowledge Graph** registry.
 
@@ -49,7 +49,7 @@ To ensure a robust pool of 22+ questions per chapter:
 ---
 
 ## 3. Mathematical Equation Solver
-The AI Tutor Router incorporates a parser in [ai-engine.ts](file:///c:/Users/Arnav/OneDrive/Desktop/better/src/lib/ai-engine.ts) to solve student doubts. It intercepts algebra queries and solves them step-by-step:
+The AI Tutor Router incorporates a parser in [`src/lib/ai-engine.ts`](../src/lib/ai-engine.ts) to solve student doubts. It intercepts algebra queries and solves them step-by-step:
 
 ### 1. Linear Equations ($ax + b = c$)
 Calculates subtraction and division steps, rendering outputs in LaTeX format:

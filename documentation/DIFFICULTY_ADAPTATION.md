@@ -1,4 +1,4 @@
-# Pathwise — Dynamic Difficulty Adaptation Engine
+# PathWise — Dynamic Difficulty Adaptation Engine
 
 Pathwise dynamically adjusts academic material difficulty to align with the student's *Zone of Proximal Development* (ZPD). The target success threshold is set between **65% and 80%** to ensure learning remains engaging but not overly frustrating.
 
@@ -49,7 +49,7 @@ $$V = \mu_{\text{recent\_half}} - \mu_{\text{older\_half}}$$
 
 ## 4. Code Implementation
 
-This is executed inside [difficulty.ts](file:///c:/Users/Arnav/OneDrive/Desktop/better/src/lib/difficulty.ts):
+This is executed inside [`src/lib/difficulty.ts`](../src/lib/difficulty.ts):
 
 ```typescript
 import { clamp } from './utils';

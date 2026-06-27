@@ -1,4 +1,4 @@
-# Pathwise — Learning Style Detection Architecture
+# PathWise — Learning Style Detection Architecture
 
 Pathwise incorporates an adaptive learning style detection engine that classifies student interactions and dynamically updates the visual presentation order of dashboard blocks. This guide details the theory, math, and code implementation of this system.
 

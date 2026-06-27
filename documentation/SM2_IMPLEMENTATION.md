@@ -1,4 +1,4 @@
-# Pathwise — Spaced Repetition (SM-2) Model
+# PathWise — Spaced Repetition (SM-2) Model
 
 Pathwise uses the SuperMemo-2 (SM-2) spaced repetition algorithm to schedule vocabulary and formula flashcards. This document details the algorithm's mathematical foundations, parameters, and the TypeScript scheduling implementations.
 
@@ -46,7 +46,7 @@ $$EF = \max(1.3, EF')$$
 
 ## 3. Code Implementation
 
-These calculations are implemented in [sm2.ts](file:///c:/Users/Arnav/OneDrive/Desktop/better/src/lib/sm2.ts):
+These calculations are implemented in [`src/lib/sm2.ts`](../src/lib/sm2.ts):
 
 ```typescript
 export interface SM2Result {

@@ -1,4 +1,4 @@
-# Pathwise — Offline Synchronization Architecture
+# PathWise — Offline Architecture
 
 Pathwise employs a robust, client-first offline architecture. Students and teachers can perform all core actions (reading notes, completing quizzes, swiping flashcards, and writing reply comments) without an internet connection. 
 
@@ -7,7 +7,7 @@ This document details the database synchronization queue, network status detecti
 ---
 
 ## 1. Network Status Detection
-The system tracks connectivity in [network.ts](file:///c:/Users/Arnav/OneDrive/Desktop/better/src/lib/network.ts) using standard browser events and active endpoint ping checks.
+The system tracks connectivity in [`src/store/appStore.ts`](../src/store/appStore.ts) using standard browser `online`/`offline` events.
 
 ```mermaid
 graph TD

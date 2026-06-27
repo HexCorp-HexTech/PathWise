@@ -1,4 +1,4 @@
-# Pathwise — Adaptive Weakness Scoring Engine
+# PathWise — Adaptive Weakness Scoring Engine
 
 Pathwise implements an analytical cognitive scoring model to diagnose student conceptual gaps. This document covers the mathematical framework, parameters, decay profiles, and code implementations used to track student struggles.
 
@@ -71,7 +71,7 @@ $$\text{Confidence} = \text{clamp}\left(\frac{\log_2(n + 1)}{4}, 0, 1\right)$$
 
 ## 4. Code Implementation
 
-This mathematical pipeline is executed in [weakness.ts](file:///c:/Users/Arnav/OneDrive/Desktop/better/src/lib/weakness.ts):
+This mathematical pipeline is executed in [`src/lib/weakness.ts`](../src/lib/weakness.ts):
 
 ```typescript
 import type { QuizAttempt, BKTMastery } from '../types';
