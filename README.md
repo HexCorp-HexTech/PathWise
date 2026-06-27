@@ -5,7 +5,7 @@
 
 **Personalised education that works anywhere — online or offline.**
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
+[![Deploy with Vercel](https://vercel.com/button)](https://path-wise-opal.vercel.app/)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)
@@ -342,7 +342,7 @@ npm run build
 ## ☁️ Deploying to Vercel
 
 1. Push to GitHub
-2. Import the repo at [vercel.com/new](https://vercel.com/new)
+2. Import the repo at [vercel.com/new](https://vercel.com/ne)
 3. Vercel auto-detects `vercel.json` — no manual settings needed
 4. Add environment variables in **Settings → Environment Variables**:
    - `GEMINI_API_KEY`
