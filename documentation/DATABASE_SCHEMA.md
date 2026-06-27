@@ -1,121 +1,189 @@
-# Pathwise — IndexedDB Database Schema (Dexie.js)
+# PathWise — IndexedDB Database Schema (Dexie.js)
 
-Pathwise relies on a client-side IndexedDB database powered by **Dexie.js** to manage sync queues, offline curriculum cache, adaptive state variables, and chat histories. This document details the database stores, indexes, relationship modeling, and query execution.
+PathWise uses a client-side IndexedDB database powered by **Dexie.js** for all persistent storage. There is no remote database — all data lives in the user's browser. This document covers the full schema, indexes, query patterns, and version history.
 
 ---
 
-## 1. Schema Configuration & Compound Indexes
-The database instance `PathwiseAI` is configured inside [db.ts](file:///c:/Users/Arnav/OneDrive/Desktop/better/src/lib/db.ts) using the following store definitions. Compound indexes are used to enable fast composite index matches (such as query queries matching a user and card ID simultaneously).
+## 1. Database Instance
+
+The database is initialised in [`src/lib/db.ts`](file:///d:/Projects/PathWise/src/lib/db.ts):
 
 ```typescript
-this.version(1).stores({
-  users: 'id, role, email',
-  studentProfiles: 'userId, grade, board',
-  teacherProfiles: 'userId, schoolCode',
-  subjects: 'id, grade, board, sortOrder',
-  chapters: 'id, subjectId, sortOrder',
-  notes: 'id, chapterId',
-  quizQuestions: 'id, chapterId, difficulty',
-  quizAttempts: 'id, userId, chapterId, startedAt',
-  flashcards: 'id, chapterId',
-  sm2Cards: 'id, [userId+flashcardId], userId, nextReviewDate',
-  bktMastery: 'id, [userId+chapterId+skillId], userId',
-  weaknessScores: 'id, [userId+chapterId], userId',
-  chatSessions: 'id, userId, updatedAt',
-  chatMessages: 'id, sessionId, createdAt',
-  assignments: 'id, teacherId, createdAt',
-  assignmentSubmissions: 'id, assignmentId, studentId',
-  doubtPosts: 'id, userId, chapterId, status',
-  doubtReplies: 'id, postId',
-  studySessions: 'id, userId, startedAt',
-  earnedAchievements: 'id, userId, badgeId',
-  syncQueue: 'id, status, priority, createdAt',
-  voiceCache: 'id, text, voiceId',
+const db = new Dexie('PathwiseAI') as PathwiseDB;
+```
+
+Current schema version: **1**
+
+---
+
+## 2. Schema Definition
+
+```typescript
+db.version(1).stores({
+  users:                  'id, role, email',
+  studentProfiles:        'userId, grade, board',
+  teacherProfiles:        'userId, schoolCode',
+  subjects:               'id, grade, board, sortOrder',
+  chapters:               'id, subjectId, sortOrder',
+  notes:                  'id, chapterId',
+  quizQuestions:          'id, chapterId, difficulty',
+  quizAttempts:           'id, userId, chapterId, startedAt',
+  flashcards:             'id, chapterId',
+  sm2Cards:               'id, [userId+flashcardId], userId, nextReviewDate',
+  bktMastery:             'id, [userId+chapterId+skillId], userId',
+  weaknessScores:         'id, [userId+chapterId], userId',
+  chatSessions:           'id, userId, updatedAt',
+  chatMessages:           'id, sessionId, createdAt',
+  assignments:            'id, teacherId, createdAt',
+  assignmentSubmissions:  'id, assignmentId, studentId',
+  doubtPosts:             'id, userId, chapterId, status',
+  doubtReplies:           'id, postId',
+  studySessions:          'id, userId, startedAt',
+  earnedAchievements:     'id, userId, badgeId',
+  syncQueue:              'id, status, priority, createdAt',
+  voiceCache:             'id, text, voiceId',
 });
 ```
 
+> **Index note:** The compound index `[userId+chapterId+skillId]` on `bktMastery` is defined but **not used directly** for mastery lookups (Dexie requires exact compound key equality). All mastery queries use `where('userId').equals(id).and(r => r.chapterId === ch)` and then average the results across matching skill records.
+
 ---
 
-## 2. Store Models & Properties
+## 3. Store Reference
 
 ### `users`
-Represents student, teacher, or parent system profiles:
-* **`id`** (string, Primary Key): Unique uuid.
-* **`role`** (string): `'student' | 'teacher' | 'parent'`.
-* **`name`** (string): Display name.
-* **`email`** (string, optional): Login email.
-* **`avatarId`** (string): Selected owl or character profile.
-* **`language`** (string): `'en' | 'hi'`.
-* **`theme`** (string): `'dark' | 'light'`.
-* **`createdAt`** / **`updatedAt`** (number): Epoch timestamps.
-
-### `studentProfiles`
-Adaptive parameters for student progress mapping:
-* **`userId`** (string, Primary Key): Foreign key matching `users.id`.
-* **`grade`** (number): Current academic grade (1-10).
-* **`board`** (string): `'CBSE' | 'ICSE' | 'STATE_MH'`.
-* **`difficultyLevel`** (number): Floating ZPD scale between `0.1` and `0.9`.
-* **`streakCurrent`** / **`streakBest`** (number): Day counters.
-* **`xpTotal`** (number): Accumulated experience points.
-* **`level`** (number): Current academic progression level.
-* **`lastStudyDate`** (string): Date in `YYYY-MM-DD` format.
-
-### `sm2Cards`
-Calculations mapping spaced reviews to memory stabilization:
-* **`id`** (string, Primary Key).
-* **`userId`** (string): Matching user.
-* **`flashcardId`** (string): Matching target card.
-* **`easiness`** (number): Ease Factor (EF), defaults to `2.5`.
-* **`interval`** (number): Days until next review.
-* **`repetitions`** (number): Consecutive correct recalls.
-* **`nextReviewDate`** (string): ISO formatted date.
-
-### `bktMastery`
-Tracks dynamic skill mastery for Bayesian adaptive quizzes:
-* **`id`** (string, Primary Key).
-* **`userId`** (string): User identifier.
-* **`chapterId`** (string): Associated chapter.
-* **`skillId`** (string): Targeted conceptual skill tag.
-* **`pKnow`** (number): Mastery probability (0.0 to 1.0).
-* **`attempts`** (number): Practice count.
+| Field | Type | Description |
+|---|---|---|
+| `id` | string (PK) | UUID generated by `generateId()` |
+| `role` | `'student' \| 'teacher' \| 'parent'` | Account type |
+| `name` | string | Display name |
+| `email` | string? | Optional email login |
+| `avatarId` | string | Chosen avatar icon |
+| `language` | `'en' \| 'hi'` | UI language |
+| `theme` | `'dark' \| 'light'` | UI theme |
+| `createdAt` / `updatedAt` | number | Unix epoch ms |
 
 ---
 
-## 3. Relationship Joins & Query Examples
-Since IndexedDB is a non-relational document store, joins are implemented at query time using helper methods.
+### `studentProfiles`
+| Field | Type | Description |
+|---|---|---|
+| `userId` | string (PK) | FK → `users.id` |
+| `grade` | number | Academic grade 1–10 |
+| `board` | string | `'CBSE' \| 'ICSE' \| 'STATE_MH'` |
+| `difficultyLevel` | number | ZPD scale `0.1–0.9` |
+| `streakCurrent` | number | Current study streak (days) |
+| `streakBest` | number | All-time best streak |
+| `xpTotal` | number | Accumulated experience points |
+| `level` | number | Level computed by `xpToLevel(xpTotal)` |
+| `lastStudyDate` | string | UTC date `YYYY-MM-DD` |
+| `learningStyle` | string | `'visual' \| 'auditory' \| 'reading'` |
 
-### Joining Student Profile and User Data
+---
+
+### `bktMastery`
+Tracks Bayesian Knowledge Tracing estimates per skill per chapter:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string (PK) | UUID |
+| `userId` | string | FK → `users.id` |
+| `chapterId` | string | FK → `chapters.id` |
+| `skillId` | string | Skill/topic tag (often same as chapterId) |
+| `pKnow` | number | Mastery probability `0.0–1.0` |
+| `pLearn` | number | Learning rate prior |
+| `pSlip` | number | Slip probability |
+| `pGuess` | number | Guess probability |
+| `attempts` | number | Total evidence count |
+| `updatedAt` | number | Last update timestamp |
+
+**Correct query pattern** (averages `pKnow` across all skills in a chapter):
 ```typescript
-import { db } from '../lib/db';
-
-export async function getStudentWithUser(userId: string) {
-  const user = await db.users.get(userId);
-  if (!user) return null;
-
-  const profile = await db.studentProfiles.where('userId').equals(userId).first();
-  return {
-    ...user,
-    profile
-  };
-}
+const records = await db.bktMastery
+  .where('userId').equals(userId)
+  .and(r => r.chapterId === chapterId)
+  .toArray();
+const avgMastery = records.length > 0
+  ? records.reduce((s, r) => s + r.pKnow, 0) / records.length
+  : 0;
 ```
 
-### Retrieving Due Flashcards for a Chapter
+---
+
+### `sm2Cards`
+SuperMemo-2 spaced repetition state per flashcard per user:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string (PK) | UUID |
+| `userId` | string | FK → `users.id` |
+| `flashcardId` | string | FK → `flashcards.id` |
+| `easiness` | number | EF (ease factor), default `2.5` |
+| `interval` | number | Days until next review |
+| `repetitions` | number | Consecutive correct recalls |
+| `nextReviewDate` | string | ISO date `YYYY-MM-DD` |
+
+---
+
+### `quizAttempts`
+Records every completed quiz session:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string (PK) | UUID |
+| `userId` | string | FK → `users.id` |
+| `chapterId` | string | FK → `chapters.id` |
+| `score` | number | Fractional score `0.0–1.0` |
+| `totalQuestions` | number | Questions in session |
+| `correctAnswers` | number | Correct count |
+| `timeTakenSec` | number | Duration in seconds |
+| `startedAt` / `endedAt` | number | Epoch timestamps |
+| `synced` | boolean | Remote sync flag |
+
+---
+
+### `notes`
+Cached AI-generated or rule-based chapter content:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string (PK) | Usually matches `chapterId` |
+| `chapterId` | string | FK → `chapters.id` |
+| `content` | string | Markdown string of lesson content |
+| `isOfflineFallback` | boolean | `true` if generated by offline engine |
+| `generatedAt` | number | Epoch timestamp |
+
+---
+
+### `syncQueue`
+Pending operations to sync when back online:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string (PK) | UUID |
+| `type` | string | Operation type (e.g. `'quiz_attempt'`) |
+| `payload` | object | Data to sync |
+| `status` | `'pending' \| 'syncing' \| 'done' \| 'failed'` | Sync state |
+| `priority` | number | Processing order |
+| `createdAt` | number | Epoch timestamp |
+| `retryCount` | number | Failed attempt count |
+
+---
+
+## 4. Versioning & Migrations
+
+Dexie supports schema version migrations. When adding new indexes or tables, increment the version number and provide an `upgrade` function:
+
 ```typescript
-export async function getDueFlashcards(userId: string, chapterId: string) {
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Find all card associations due today or overdue
-  const sm2Records = await db.sm2Cards
-    .where('userId')
-    .equals(userId)
-    .and(card => card.nextReviewDate <= today)
-    .toArray();
-    
-  const dueIds = sm2Records.map(r => r.flashcardId);
-  
-  // Join with static/cached flashcard content
-  const allCards = await db.flashcards.where('chapterId').equals(chapterId).toArray();
-  return allCards.filter(c => dueIds.includes(c.id));
-}
+db.version(2).stores({
+  // add new table or index here
+  newTable: 'id, foreignKey'
+}).upgrade(tx => {
+  // migrate existing data if needed
+  return tx.table('existingTable').toCollection().modify(record => {
+    record.newField = 'defaultValue';
+  });
+});
 ```
+
+> **Important:** Never remove an index from an earlier version definition. Only add to later versions.

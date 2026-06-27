@@ -16,6 +16,14 @@ import './Auth.css';
 /* Role Selection */
 export const RoleSelection: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const roles = [
     { id: 'student', label: 'Student', desc: 'I want to learn', icon: <BookOpen size={32} />, color: '#4ECDC4', path: '/auth/student/login' },
     { id: 'teacher', label: 'Teacher', desc: 'I want to teach', icon: <User size={32} />, color: '#FF6B6B', path: '/auth/teacher/login' },
@@ -59,7 +67,14 @@ export const RoleSelection: React.FC = () => {
 /* Student Login */
 export const StudentLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { loginStudent } = useAuthStore();
+  const { loginStudent, isAuthenticated, user } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [students, setStudents] = useState<any[]>([]);
@@ -174,13 +189,17 @@ export const StudentLogin: React.FC = () => {
           Login
         </Button>
 
-        <div className="auth-divider">
-          <span>or</span>
-        </div>
+        {import.meta.env.DEV && (
+          <>
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
 
-        <Button variant="secondary" fullWidth onClick={handleDemoLogin}>
-          Quick Demo Login
-        </Button>
+            <Button variant="secondary" fullWidth onClick={handleDemoLogin}>
+              Quick Demo Login
+            </Button>
+          </>
+        )}
 
         <p className="auth-switch">
           New student? <button onClick={() => navigate('/auth/student/signup')}>Sign up</button>
@@ -193,7 +212,14 @@ export const StudentLogin: React.FC = () => {
 /* Student Signup */
 export const StudentSignup: React.FC = () => {
   const navigate = useNavigate();
-  const { loginStudent } = useAuthStore();
+  const { loginStudent, isAuthenticated, user } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [grade, setGrade] = useState(7);
@@ -501,7 +527,14 @@ export const StudentSignup: React.FC = () => {
 /* Teacher Login */
 export const TeacherLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { loginTeacher } = useAuthStore();
+  const { loginTeacher, isAuthenticated, user } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -601,11 +634,15 @@ export const TeacherLogin: React.FC = () => {
             Login
           </Button>
 
-          <div className="auth-divider"><span>or</span></div>
+          {import.meta.env.DEV && (
+            <>
+              <div className="auth-divider"><span>or</span></div>
 
-          <Button variant="secondary" fullWidth onClick={handleDemoLogin}>
-            Quick Demo Login
-          </Button>
+              <Button variant="secondary" fullWidth onClick={handleDemoLogin}>
+                Quick Demo Login
+              </Button>
+            </>
+          )}
         </div>
 
         <p className="auth-switch">
@@ -619,7 +656,14 @@ export const TeacherLogin: React.FC = () => {
 /* Teacher Signup */
 export const TeacherSignup: React.FC = () => {
   const navigate = useNavigate();
-  const { loginTeacher } = useAuthStore();
+  const { loginTeacher, isAuthenticated, user } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [schoolCode, setSchoolCode] = useState('');
@@ -747,7 +791,13 @@ export const TeacherSignup: React.FC = () => {
 /* Parent Login */
 export const ParentLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { loginParent } = useAuthStore();
+  const { loginParent, isAuthenticated, user } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const [parentCode, setParentCode] = useState('');
   const [error, setError] = useState('');
@@ -831,11 +881,15 @@ export const ParentLogin: React.FC = () => {
           View Dashboard
         </Button>
 
-        <div className="auth-divider"><span>or</span></div>
+        {import.meta.env.DEV && (
+          <>
+            <div className="auth-divider"><span>or</span></div>
 
-        <Button variant="secondary" fullWidth onClick={handleDemoLogin}>
-          Quick Demo Access
-        </Button>
+            <Button variant="secondary" fullWidth onClick={handleDemoLogin}>
+              Quick Demo Access
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

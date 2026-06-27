@@ -8,6 +8,7 @@ import { useAuthStore } from './store/authStore';
 import { AppShell } from './components/layout/AppShell';
 import { initializeDatabase } from './lib/db';
 import { registerDbDebugger } from './lib/db-debug';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Pages
 import { LandingPage } from './pages/Landing';
@@ -85,7 +86,8 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <Routes>
+      <ErrorBoundary>
+        <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<RoleSelection />} />
@@ -272,6 +274,7 @@ const App: React.FC = () => {
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 };

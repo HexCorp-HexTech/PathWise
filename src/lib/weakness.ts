@@ -142,7 +142,14 @@ export function generateRecommendations(
   const sorted = rankWeaknesses(weaknesses);
 
   for (const w of sorted.slice(0, 3)) {
-    const subjectName = subjectNames[w.subjectId] || 'this subject';
+    let subjectName = subjectNames[w.subjectId];
+    if (!subjectName && w.subjectId) {
+      const parts = w.subjectId.split('-');
+      if (parts.length > 2) {
+        subjectName = parts[2].charAt(0).toUpperCase() + parts[2].slice(1);
+      }
+    }
+    if (!subjectName) subjectName = 'this subject';
 
     if (w.weaknessScore > 0.7) {
       recommendations.push(`Focus on revising ${subjectName} — your fundamentals need strengthening`);

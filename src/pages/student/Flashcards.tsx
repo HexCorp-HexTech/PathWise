@@ -13,7 +13,7 @@ import { generateFlashcards } from '../../lib/ai-engine';
 import { CURRICULUM_DATA } from '../../data/curriculum-data';
 import { speakText, detectLanguage } from '../../lib/voice';
 import { calculateSM2, createSM2Card } from '../../lib/sm2';
-import { generateId } from '../../lib/utils';
+import { generateId, xpToLevel } from '../../lib/utils';
 import { db } from '../../lib/db';
 import type { Flashcard, SM2Card, Subject, Chapter } from '../../types';
 import './Flashcards.css';
@@ -39,6 +39,7 @@ export const FlashcardsPage: React.FC = () => {
   // Stats
   const [cardsReviewed, setCardsReviewed] = useState(0);
   const [xpEarned, setXpEarned] = useState(0);
+  const [ttsError, setTtsError] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -81,12 +82,14 @@ export const FlashcardsPage: React.FC = () => {
             console.error('[Flashcard TTS Error]', err);
             setIsSpeaking(false);
             setPlaybackControls(null);
-            alert(err.message || 'Failed to synthesize speech.');
+            setTtsError(err.message || 'Failed to synthesize speech.');
+            setTimeout(() => setTtsError(null), 3000);
           }
         );
         setPlaybackControls(controls);
       } catch (err: any) {
-        alert(err.message || 'Failed to synthesize speech.');
+        setTtsError(err.message || 'Failed to synthesize speech.');
+        setTimeout(() => setTtsError(null), 3000);
       }
     }
   };
@@ -341,19 +344,15 @@ export const FlashcardsPage: React.FC = () => {
         synced: false
       });
 
-      // Update student profile XP
+      // Update student profile XP using xpToLevel for consistent level calculation
       const currentXP = studentProfile.xpTotal + earned;
-      const nextLevelThreshold = studentProfile.level * 1000;
-      let newLevel = studentProfile.level;
-      if (currentXP >= nextLevelThreshold) {
-        newLevel += 1;
-      }
+      const { level: newLevel } = xpToLevel(currentXP);
 
       const updatedProfile = {
         ...studentProfile,
         xpTotal: currentXP,
         level: newLevel,
-        lastStudyDate: new Date().toDateString()
+        lastStudyDate: new Date().toISOString().split('T')[0]
       };
 
       updateStudentProfile(updatedProfile);
@@ -430,6 +429,11 @@ export const FlashcardsPage: React.FC = () => {
           {currentIdx + 1} of {cards.length}
         </span>
       </div>
+      {ttsError && (
+        <div className="toast-notification toast-notification--error" role="alert" style={{ margin: '0 var(--sp-4) var(--sp-2)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-2) var(--sp-3)', background: 'var(--color-error)', color: '#fff', fontSize: 'var(--fs-caption)' }}>
+          🔇 {ttsError}
+        </div>
+      )}
 
       <ProgressBar value={progressPct} size="sm" />
 

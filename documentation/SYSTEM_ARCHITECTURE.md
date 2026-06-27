@@ -1,92 +1,146 @@
-# Pathwise — PWA System Architecture
+# PathWise — System Architecture
 
-Pathwise is an offline-first Progressive Web App (PWA) designed for adaptive educational delivery in grades 1-10. This document covers the architecture topology, tech stack, data synchronization flows, state boundaries, and folder layouts.
+PathWise is a **frontend-only, offline-first** Progressive Web App (PWA) for adaptive K-10 education. All core intelligence—BKT mastery, SM-2 scheduling, weakness scoring, and AI content generation—runs entirely in the browser. Optional AI features are powered by Vercel Serverless Functions that proxy Gemini and ElevenLabs APIs.
 
 ---
 
 ## 1. System Topology
-Pathwise runs client-side as a high-fidelity Progressive Web App. All core calculations (BKT mastery, SM-2 flashcard intervals, weakness metrics, and AI solver systems) execute locally.
 
-```mermaid
-graph TD
-    UI["React Frontend Pages (Student, Teacher, Parent)"] <--> Z["Zustand Store (InMemory State)"]
-    Z <--> D["Dexie.js / IndexedDB (Local Persistent Storage)"]
-    D --> SQ["Sync Queue Store"]
-    SQ <--> SW["Service Worker Sync Hooks"]
-    SW <--> API["Remote Sync Endpoints (Optional)"]
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Browser (Client Only)                 │
+│                                                         │
+│   React 19 + TypeScript + Vite                          │
+│   ┌─────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│   │ Student UI  │  │  Teacher UI  │  │  Parent UI   │  │
+│   └──────┬──────┘  └──────┬───────┘  └──────┬───────┘  │
+│          └────────────────┼──────────────────┘          │
+│                    ┌──────▼──────┐                      │
+│                    │   Zustand   │  (In-memory state)   │
+│                    └──────┬──────┘                      │
+│                    ┌──────▼──────┐                      │
+│                    │  Dexie.js   │  (IndexedDB store)   │
+│                    └─────────────┘                      │
+└─────────────────────────────────────────────────────────┘
+              │ fetch /api/*
+┌─────────────▼──────────────────────────────────────────┐
+│            Vercel Serverless Functions (Edge)           │
+│   /api/tts  /api/parse-syllabus                         │
+│   /api/fetch-syllabus  /api/generate-chapter-content    │
+└─────────────┬──────────────────────────────────────────┘
+              │
+    ┌─────────▼──────────┐
+    │   External APIs    │
+    │  Gemini 1.5 Flash  │
+    │  ElevenLabs TTS    │
+    └────────────────────┘
 ```
 
 ---
 
-## 2. Directory Structure & File Map
+## 2. Directory Structure
 
-```txt
-/better
+```
+pathwise/
+├── api/                          # Vercel Serverless Functions
+│   ├── tts.js                    # ElevenLabs TTS proxy
+│   ├── fetch-syllabus.js         # URL scraper & HTML stripper
+│   ├── parse-syllabus.js         # Gemini syllabus parser
+│   └── generate-chapter-content.js  # Gemini chapter content generator
 ├── src/
-│   ├── main.tsx              # Application entrypoint
-│   ├── App.tsx               # Routing, theme wrapper, and shell loading
-│   ├── index.css             # Design token variables, global styles, and print layout overrides
-│   ├── types/
-│   │   └── index.ts          # Core interfaces (Quiz, Flashcard, User, BKT, Sync)
+│   ├── main.tsx                  # Application entrypoint
+│   ├── App.tsx                   # Routing + ErrorBoundary shell
+│   ├── index.css                 # Design tokens (CSS variables) + global styles
+│   ├── types/index.ts            # TypeScript interfaces (Quiz, BKT, User, SM2…)
 │   ├── lib/
-│   │   ├── db.ts             # Dexie.js database schema & table initializations
-│   │   ├── bkt.ts            # Bayesian Knowledge Tracing hidden Markov models
-│   │   ├── sm2.ts            # SuperMemo-2 spaced repetition schedules
-│   │   ├── difficulty.ts     # Zone of Proximal Development adaptation parameters
-│   │   ├── weakness.ts       # Performance and consistency decay analysis
-│   │   ├── ai-engine.ts      # Structured knowledge compiled solver & validator
-│   │   ├── voice.ts          # Voice synthesis text-to-speech engine wrapper
-│   │   └── utils.ts          # Id generators, clamps, and mathematical helpers
+│   │   ├── db.ts                 # Dexie.js DB schema & table definitions
+│   │   ├── bkt.ts                # Bayesian Knowledge Tracing (BKT) engine
+│   │   ├── sm2.ts                # SuperMemo-2 spaced repetition scheduler
+│   │   ├── compute-mastery.ts    # Chapter mastery aggregation (BKT + quiz scores)
+│   │   ├── weakness.ts           # Weakness scoring and subject name parsing
+│   │   ├── ai-engine.ts          # Rule-based offline quiz/flashcard generator
+│   │   ├── markdown-utils.ts     # AI JSON → Markdown converter (offline notes)
+│   │   ├── voice.ts              # TTS speech synthesis wrapper
+│   │   └── utils.ts              # Helpers: generateId, xpToLevel, clamp, formatTime
 │   ├── store/
-│   │   ├── appStore.ts       # General PWA state (sidebar, theme, network, language)
-│   │   └── authStore.ts      # Active user sessions, onboarding profiles, and roles
+│   │   ├── appStore.ts           # App-wide state (theme, language, isMobile)
+│   │   └── authStore.ts          # Auth sessions, user profiles, onboarding
 │   ├── components/
-│   │   ├── ui/               # Reusable buttons, cards, progress widgets, and modals
-│   │   ├── mascot/           # SVG Gyani owl components with state speech bubbles
-│   │   └── layout/           # AppShell, side navigation, mobile bottom navigation
+│   │   ├── ErrorBoundary.tsx     # React error boundary with recovery UI
+│   │   ├── ui/                   # Buttons, Cards, Progress, Modal primitives
+│   │   ├── mascot/               # Gyani owl SVG with speech bubbles
+│   │   └── layout/               # AppShell, sidebar, bottom nav
 │   └── pages/
-│       ├── Landing.tsx       # Marketing, features review, and FAQ page
-│       ├── auth/             # Onboarding, signup, and PIN-secured entry gates
-│       ├── student/          # Adaptive dashboard, curriculum explorer, AI tutor chat
-│       ├── teacher/          # Student grid directories, assignments creator, and classrooms
-│       └── parent/           # Analytics charts and WhatsApp progress sharing triggers
+│       ├── Landing.tsx           # Marketing / feature showcase page
+│       ├── auth/Auth.tsx         # Login, signup, PIN gate, onboarding wizard
+│       ├── student/
+│       │   ├── Dashboard.tsx     # Student home: XP, streak, recommendations
+│       │   ├── Subjects.tsx      # Chapter browser, notes viewer, offline banner
+│       │   ├── Quiz.tsx          # Adaptive quiz engine with BKT updates
+│       │   ├── Flashcards.tsx    # SM-2 spaced repetition flashcard reviewer
+│       │   ├── AIChat.tsx        # AI tutor chat session
+│       │   └── Progress.tsx      # Mastery charts and analytics
+│       ├── teacher/              # Classroom manager, assignment creator
+│       └── parent/
+│           ├── Dashboard.tsx     # Child progress overview
+│           └── WeeklyReport.tsx  # Weekly study report with strength/weakness analysis
+├── documentation/                # Technical docs (this file and more)
+├── public/                       # Static assets (icons, favicon, manifest)
+├── vercel.json                   # Vercel build + routing configuration
+└── vite.config.ts                # Vite build config + dev API middleware
 ```
 
 ---
 
-## 3. Tech Stack Rationale
+## 3. Tech Stack
 
-### 1. React 19 & TypeScript
-- Core structure is built on React 19 to support hook boundaries and resource optimization.
-- TypeScript enforces strict typings across quiz schemas, attempts, and BKT masteries to prevent runtime errors.
-
-### 2. Dexie.js (IndexedDB)
-- Native IndexedDB has a low-level event listener API which is verbose and prone to locks.
-- Dexie.js wraps IndexedDB in an elegant Promise-based API, supporting transactional consistency, complex compound queries, and schema version control.
-- This serves as the local database holding cached notes, diagrams, attempts, and chat messages.
-
-### 3. Zustand Stores
-- Lightweight, atomic state manager.
-- Separates transient UI flags (like `sidebarCollapsed`) from local database calls.
-- Integrates local storage persistence middleware (`persist`) to maintain sessions across browser refreshes.
-
-### 4. Custom CSS Design Token System
-- Design tokens are configured in CSS root variables for fast and light theme changes.
-- Uses `color-scheme` properties to automatically theme scrollbars and native calendars.
+| Layer | Technology | Reason |
+|---|---|---|
+| UI Framework | React 19 + TypeScript | Hooks, strict types, component reuse |
+| Build Tool | Vite 8 | Fast HMR, ESM-native bundling |
+| Client State | Zustand | Lightweight, no boilerplate, persists via `localStorage` |
+| Local Storage | Dexie.js (IndexedDB) | Transactional, Promise-based, schema versioning |
+| Routing | React Router v7 | SPA routing with auth guards |
+| Styling | Vanilla CSS + CSS Variables | Zero-runtime, design token system |
+| AI Content | Gemini 1.5 Flash (via Vercel) | Chapter notes, quiz, flashcards |
+| TTS | ElevenLabs Multilingual v2 (via Vercel) | Hindi + English voice support |
+| Deployment | Vercel | SPA + serverless functions in one platform |
 
 ---
 
-## 4. State Synchronization Loop
+## 4. Adaptive Learning Data Flow
 
-### The Offline Transition
-1. **Student action**: A student answers a quiz question.
-2. **Local Update**:
-   - `Quiz.tsx` calculates scores.
-   - Updates BKT mastery probabilities in IndexedDB.
-   - Recalculates weakness indexes.
-3. **Zustand Action**: Stores XP rewards and updates student level.
-4. **Queue Registration**: Saves a pending transaction object inside `syncQueue` (Dexie).
-5. **Sync Service**:
-   - The system queries `NetworkState`.
-   - If online, it processes the queue sequentially, pushing updates to the remote server.
-   - If offline, the queue remains in IndexedDB and updates when connectivity is restored.
+```
+Student answers question
+         │
+         ▼
+Quiz.tsx scores answer
+         │
+         ├──► updateBKT()  → writes bktMastery to IndexedDB
+         ├──► computeWeaknessScore() → writes weaknessScores to IndexedDB
+         └──► updateStudentProfile()  → XP via xpToLevel(), streak via UTC date comparison
+```
+
+All updates are **synchronous to IndexedDB** — no network round-trip needed.
+
+---
+
+## 5. Offline Behaviour
+
+| Feature | Online | Offline |
+|---|---|---|
+| Curriculum browse | ✅ IndexedDB | ✅ IndexedDB |
+| Chapter notes (AI) | ✅ Gemini API | ✅ Rule-based fallback (`ai-engine.ts`) |
+| Flashcards | ✅ Cached in IndexedDB | ✅ Cached |
+| Quiz | ✅ Cached questions | ✅ AI generates from fallback engine |
+| TTS audio | ✅ ElevenLabs API | ❌ Error toast shown, no blocking alert |
+| Syllabus import | ✅ Fetch + Gemini | ⚠️ Manual entry still works |
+
+---
+
+## 6. Error Handling
+
+- **`ErrorBoundary.tsx`**: Wraps the entire React tree. Catches runtime crashes and shows a recovery screen with a "Reload App" button. Prevents white-screen failures.
+- **TTS errors**: Displayed as 3-second non-blocking toast notifications (replaced all `alert()` calls).
+- **API failures**: Handled gracefully with fallback content; no unhandled promise rejections.
+- **Missing DB records**: All Dexie queries use `.first()` / `.toArray()` with null checks to prevent crashes.

@@ -45,7 +45,7 @@ export const useAppStore = create<AppState>()(
       language: 'en',
       fontSize: 'medium',
       sidebarCollapsed: false,
-      isMobile: window.innerWidth < 768,
+      isMobile: typeof window !== 'undefined' ? window.innerWidth < 768 : false,
       networkState: 'online',
       pendingSyncCount: 0,
       voiceStatus: 'idle',

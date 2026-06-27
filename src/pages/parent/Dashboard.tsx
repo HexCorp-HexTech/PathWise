@@ -71,12 +71,16 @@ export const ParentDashboard: React.FC = () => {
               const s = a.score ?? 0;
               return s > 1 ? s / 100 : s;
             })) : 0;
-            const bktRecord = await db.bktMastery
-              .where('[userId+chapterId+skillId]')
-              .equals([activeUser.id, ch.id, ch.id])
-              .first();
+            const bktRecords = await db.bktMastery
+              .where('userId')
+              .equals(activeUser.id)
+              .and(r => r.chapterId === ch.id)
+              .toArray();
+            const avgBkt = bktRecords.length > 0
+              ? bktRecords.reduce((sum, r) => sum + r.pKnow, 0) / bktRecords.length
+              : null;
 
-            sumMastery += bktRecord ? bktRecord.pKnow : maxScore;
+            sumMastery += avgBkt !== null ? avgBkt : maxScore;
           }
 
           const avgMastery = chaps.length > 0 ? sumMastery / chaps.length : 0;

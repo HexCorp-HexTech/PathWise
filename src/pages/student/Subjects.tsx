@@ -3,7 +3,7 @@
    ============================================ */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Brain, FileText, Zap, CheckCircle, Lock, Clock, Star, MessageSquare, Copy, Check, Printer, Volume2 } from 'lucide-react';
+import { ArrowLeft, Brain, FileText, Zap, CheckCircle, Lock, Clock, Star, MessageSquare, Copy, Check, Printer, Volume2, AlertCircle } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { ProgressBar, ProgressRing } from '../../components/ui/Progress';
 import { Button } from '../../components/ui/Button';
@@ -16,6 +16,7 @@ import { speakText } from '../../lib/voice';
 import type { Subject, Chapter } from '../../types';
 import { MarkdownRenderer } from '../../components/chat/MarkdownRenderer';
 import { useTranslation } from '../../lib/translations';
+import { convertAiJsonToMarkdown } from '../../lib/markdown-utils';
 import './Subjects.css';
 
 interface SubjectProgressDetail {
@@ -71,12 +72,17 @@ export const SubjectExplorer: React.FC = () => {
             completed++;
           }
 
-          const bktRecord = await db.bktMastery
-            .where('[userId+chapterId+skillId]')
-            .equals([studentProfile.userId, ch.id, ch.id])
-            .first();
+          const bktRecords = await db.bktMastery
+            .where('userId')
+            .equals(studentProfile.userId)
+            .and(b => b.chapterId === ch.id)
+            .toArray();
 
-          const chMastery = bktRecord ? bktRecord.pKnow : maxScore;
+          let chMastery = maxScore;
+          if (bktRecords.length > 0) {
+            const sumKnow = bktRecords.reduce((sum, r) => sum + r.pKnow, 0);
+            chMastery = sumKnow / bktRecords.length;
+          }
           sumMastery += chMastery;
 
           if (chMastery > 0 && chMastery < 0.75) {
@@ -185,16 +191,33 @@ export const SubjectDetail: React.FC = () => {
 
       const subjChapters = await db.chapters.where('subjectId').equals(subjectId).toArray();
       subjChapters.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      
+      const chapterIds = subjChapters.map(ch => ch.id);
+      const allAttempts = await db.quizAttempts
+        .where('userId')
+        .equals(studentProfile.userId)
+        .toArray();
+      const attemptsByChapter = new Map<string, typeof allAttempts>();
+      for (const att of allAttempts) {
+        if (chapterIds.includes(att.chapterId)) {
+          const l = attemptsByChapter.get(att.chapterId) || [];
+          l.push(att);
+          attemptsByChapter.set(att.chapterId, l);
+        }
+      }
+
+      const isChapterCompletedSync = (chId: string) => {
+        const attempts = attemptsByChapter.get(chId) || [];
+        return attempts.length > 0 && Math.max(...attempts.map(a => a.score)) >= 0.8;
+      };
+
       const list = [];
       let completedCount = 0;
       let sumMastery = 0;
 
       for (let i = 0; i < subjChapters.length; i++) {
         const ch = subjChapters[i];
-        const attempts = await db.quizAttempts
-          .where('userId').equals(studentProfile.userId)
-          .and(att => att.chapterId === ch.id)
-          .toArray();
+        const attempts = attemptsByChapter.get(ch.id) || [];
 
         const maxScore = attempts.length > 0 ? Math.max(...attempts.map(a => a.score)) : 0;
         const isCompleted = maxScore >= 0.8;
@@ -203,17 +226,21 @@ export const SubjectDetail: React.FC = () => {
           completedCount++;
         }
 
-        const bktRecord = await db.bktMastery
-          .where('[userId+chapterId+skillId]')
-          .equals([studentProfile.userId, ch.id, ch.id])
-          .first();
+        const bktRecords = await db.bktMastery
+          .where('userId')
+          .equals(studentProfile.userId)
+          .and(b => b.chapterId === ch.id)
+          .toArray();
 
-        const chMastery = bktRecord ? bktRecord.pKnow : maxScore;
+        let chMastery = maxScore;
+        if (bktRecords.length > 0) {
+          const sumKnow = bktRecords.reduce((sum, r) => sum + r.pKnow, 0);
+          chMastery = sumKnow / bktRecords.length;
+        }
         sumMastery += chMastery;
 
         const isWeak = chMastery > 0 && chMastery < 0.75;
-        // Lock rules: chapter 1 is always unlocked. Succeeding chapters unlock if previous chapter is completed.
-        const isLocked = i > 0 && !(await isChapterCompleted(subjChapters[i - 1].id, studentProfile.userId));
+        const isLocked = i > 0 && !isChapterCompletedSync(subjChapters[i - 1].id);
 
         list.push({
           id: ch.id,
@@ -233,11 +260,6 @@ export const SubjectDetail: React.FC = () => {
       });
       setChaptersList(list);
       setLoading(false);
-    };
-
-    const isChapterCompleted = async (chId: string, uId: string) => {
-      const attempts = await db.quizAttempts.where('userId').equals(uId).and(a => a.chapterId === chId).toArray();
-      return attempts.length > 0 && Math.max(...attempts.map(a => a.score)) >= 0.8;
     };
 
     fetchChaptersProgress();
@@ -311,6 +333,7 @@ export const ChapterView: React.FC = () => {
   const [mnemonicTricks, setMnemonicTricks] = useState<string[]>([]);
   const [definitions, setDefinitions] = useState<{ term: string; definition: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ttsError, setTtsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchChapterAndSubject = async () => {
@@ -417,9 +440,24 @@ export const ChapterView: React.FC = () => {
               }
             } else {
               console.error('[ChapterView] Failed to generate custom chapter content.');
+              throw new Error('Failed to generate custom chapter content');
             }
           } catch (fetchErr) {
             console.error('[ChapterView] Network/API error fetching custom content. Using offline fallback...', fetchErr);
+            const fallbackContent = language === 'hi'
+              ? `# ${chapter.title}\n\nसामग्री अभी उपलब्ध नहीं है क्योंकि आप ऑफ़लाइन हैं या सर्वर अनुपलब्ध है।\n\n## विवरण\n${chapter.description}`
+              : `# ${chapter.title}\n\nContent is temporarily unavailable because you are offline or the service is down.\n\n## Description\n${chapter.description}`;
+
+            notesRecord = {
+              id: `${chapter.id}_notes`,
+              chapterId: chapter.id,
+              content: fallbackContent,
+              generatedBy: 'ai' as const,
+              version: 1,
+              createdAt: Date.now()
+            };
+            await db.notes.put(notesRecord);
+            setNotes({ id: notesRecord!.id, content: fallbackContent });
           }
         }
 
@@ -510,91 +548,7 @@ export const ChapterView: React.FC = () => {
     loadContent();
   }, [chapter, subject, language]);
 
-function convertAiJsonToMarkdown(data: any, title: string, subject: string, board: string, grade: number): string {
-  let text = `<div class="pdf-cover-page">
-  <div class="pdf-cover-badge">${board} • Grade ${grade}</div>
-  <h1 class="pdf-cover-title">${title}</h1>
-  <div class="pdf-cover-subtitle">Complete Concept Notes & Diagnostic Guide</div>
-  <div class="pdf-cover-metadata">Subject: ${subject} • Board: ${board} • Grade: Class ${grade} • Compiled by Pathwise AI Engine</div>
-</div>\n\n`;
-
-  text += `\n\n---\n**Curriculum Focus Information**:\n- **Board**: ${board}\n- **Class/Grade**: Grade ${grade}\n- **Subject**: ${subject}\n- **Chapter**: ${title}\n---\n\n`;
-
-  text += `## Executive Summary & Overview\n\n${data.overview || ''}\n\n`;
-
-  if (data.theorySections && data.theorySections.length > 0) {
-    text += `## Core Concepts and Explanations\n\n`;
-    data.theorySections.forEach((s: any) => {
-      text += `### ${s.title}\n\n${s.content}\n\n`;
-    });
-  }
-
-  if (data.formulas && data.formulas.length > 0) {
-    text += `## Formula Cheat Sheet\n\n`;
-    text += `| Formula Name | Equation | Explanation |\n`;
-    text += `| :--- | :---: | :--- |\n`;
-    data.formulas.forEach((f: any) => {
-      text += `| **${f.name}** | $${f.formula}$ | ${f.explanation} |\n`;
-    });
-    text += `\n`;
-  }
-
-  if (data.workedExamples && data.workedExamples.length > 0) {
-    text += `## Step-by-Step Worked Problems\n\n`;
-    data.workedExamples.forEach((ex: any, idx: number) => {
-      text += `### Problem ${idx + 1}:\n${ex.question}\n\n**Step-by-step Solution**:\n`;
-      if (Array.isArray(ex.stepByStep)) {
-        ex.stepByStep.forEach((step: string, stepIdx: number) => {
-          text += `${stepIdx + 1}. ${step}\n`;
-        });
-      } else {
-        text += `${ex.stepByStep}\n`;
-      }
-      text += `\n**Final Answer**: ${ex.solution}\n\n`;
-    });
-  }
-
-  if (data.commonMistakes && data.commonMistakes.length > 0) {
-    text += `## Common Mistakes to Avoid\n\n`;
-    text += `| Common Pitfall | Recommended Correction | Explanation |\n`;
-    text += `| :--- | :--- | :--- |\n`;
-    data.commonMistakes.forEach((m: any) => {
-      text += `| *${m.mistake}* | **${m.correction}** | ${m.explanation} |\n`;
-    });
-    text += `\n`;
-  }
-
-  if ((data.examTricks && data.examTricks.length > 0) || (data.memoryTips && data.memoryTips.length > 0)) {
-    text += `## High-Yield Exam Preparation\n\n`;
-    if (data.examTricks) {
-      data.examTricks.forEach((trick: string) => {
-        text += `> [!TIP]\n> **Exam Trick**: ${trick}\n\n`;
-      });
-    }
-    if (data.memoryTips) {
-      data.memoryTips.forEach((tip: string) => {
-        text += `> [!NOTE]\n> **Memory Mnemonic**: ${tip}\n\n`;
-      });
-    }
-  }
-
-  if (data.summaryPoints && data.summaryPoints.length > 0) {
-    text += `## Key Takeaways\n\n`;
-    data.summaryPoints.forEach((point: string) => {
-      text += `- ${point}\n`;
-    });
-    text += `\n`;
-  }
-
-  text += `## Revision Checklist\n\n`;
-  text += `- [ ] Memorize the core definitions.\n`;
-  text += `- [ ] Master the formulas on the cheat sheet.\n`;
-  text += `- [ ] Re-solve the worked examples without looking.\n`;
-  text += `- [ ] Double-check common exam pitfalls.\n`;
-  text += `- [ ] Complete the diagnostic quiz and check solutions.\n`;
-
-  return text;
-}
+// convertAiJsonToMarkdown moved to markdown-utils.ts
 
   useEffect(() => {
     return () => {
@@ -650,12 +604,14 @@ function convertAiJsonToMarkdown(data: any, title: string, subject: string, boar
             console.error('[Notes TTS Error]', err);
             setIsSpeaking(false);
             setPlaybackControls(null);
-            alert(err.message || 'Failed to synthesize speech.');
+            setTtsError(err.message || 'Failed to synthesize speech.');
+            setTimeout(() => setTtsError(null), 3000);
           }
         );
         setPlaybackControls(controls);
       } catch (err: any) {
-        alert(err.message || 'Failed to synthesize speech.');
+        setTtsError(err.message || 'Failed to synthesize speech.');
+        setTimeout(() => setTtsError(null), 3000);
       }
     }
   };
@@ -726,6 +682,24 @@ function convertAiJsonToMarkdown(data: any, title: string, subject: string, boar
                 </div>
               ) : (
                 <>
+                  {(notes?.content?.includes('offline') || notes?.content?.includes('सामग्री अभी उपलब्ध नहीं है')) && (
+                    <div className="offline-notes-banner" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--sp-2)',
+                      padding: 'var(--sp-3) var(--sp-4)',
+                      background: 'rgba(247, 220, 111, 0.1)',
+                      border: '1px solid var(--color-border)',
+                      borderLeft: '4px solid var(--color-warning)',
+                      borderRadius: 'var(--radius-md)',
+                      marginBottom: 'var(--sp-4)',
+                      color: 'var(--color-text-primary)',
+                      fontSize: 'var(--fs-body-sm)'
+                    }}>
+                      <AlertCircle size={16} color="var(--color-warning)" />
+                      <span>{language === 'hi' ? 'आप ऑफ़लाइन संस्करण देख रहे हैं।' : 'You are viewing cached offline content.'}</span>
+                    </div>
+                  )}
                   <div className="notes-action-bar" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-4)' }}>
                     <Button
                       variant="secondary"
@@ -840,6 +814,12 @@ function convertAiJsonToMarkdown(data: any, title: string, subject: string, boar
           </div>
         )}
       </div>
+      {ttsError && (
+        <div className="toast-notification">
+          <AlertCircle size={16} color="var(--color-error)" />
+          <span>{ttsError}</span>
+        </div>
+      )}
     </div>
   );
 };

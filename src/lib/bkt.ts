@@ -90,14 +90,27 @@ export function batchUpdateBKT(
   initialParams: BKTParams,
   responses: boolean[]
 ): BKTUpdateResult {
-  let currentParams = { ...initialParams };
-
-  for (const isCorrect of responses) {
-    const result = updateBKT(currentParams, isCorrect);
-    currentParams = { ...currentParams, pKnow: result.pKnow };
+  if (responses.length === 0) {
+    return {
+      pKnow: initialParams.pKnow,
+      isMastered: initialParams.pKnow >= MASTERY_THRESHOLD,
+      confidence: Math.abs(initialParams.pKnow - 0.5) * 2,
+    };
   }
 
-  return updateBKT(currentParams, responses[responses.length - 1]);
+  let currentParams = { ...initialParams };
+  let lastResult: BKTUpdateResult = {
+    pKnow: initialParams.pKnow,
+    isMastered: initialParams.pKnow >= MASTERY_THRESHOLD,
+    confidence: Math.abs(initialParams.pKnow - 0.5) * 2,
+  };
+
+  for (const isCorrect of responses) {
+    lastResult = updateBKT(currentParams, isCorrect);
+    currentParams = { ...currentParams, pKnow: lastResult.pKnow };
+  }
+
+  return lastResult;
 }
 
 /**
@@ -115,11 +128,12 @@ export function predictCorrect(params: BKTParams): number {
 export function estimatePracticeToMastery(params: BKTParams): number {
   let pKnow = params.pKnow;
   let count = 0;
-  const maxIterations = 100;
+  const maxIterations = 20;
 
   while (pKnow < MASTERY_THRESHOLD && count < maxIterations) {
     // Assume correct answers (optimistic estimate)
     const result = updateBKT({ ...params, pKnow }, true);
+    if (result.pKnow <= pKnow) break;
     pKnow = result.pKnow;
     count++;
   }

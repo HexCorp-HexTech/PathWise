@@ -16,7 +16,7 @@ import { CURRICULUM_DATA } from '../../data/curriculum-data';
 import { speakText } from '../../lib/voice';
 import { updateBKT, createDefaultBKT } from '../../lib/bkt';
 import { computeWeaknessScore } from '../../lib/weakness';
-import { generateId } from '../../lib/utils';
+import { generateId, xpToLevel } from '../../lib/utils';
 import { db } from '../../lib/db';
 import { useTranslation } from '../../lib/translations';
 import type { QuizQuestion, QuizAttempt, BKTMastery, Subject, Chapter } from '../../types';
@@ -52,6 +52,7 @@ export const QuizPage: React.FC = () => {
   const [xpEarned, setXpEarned] = useState(0);
   const [finalScore, setFinalScore] = useState(0);
   const [weaknessSummary, setWeaknessSummary] = useState<{ name: string; isWeak: boolean }[]>([]);
+  const [ttsError, setTtsError] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -94,12 +95,14 @@ export const QuizPage: React.FC = () => {
             console.error('[Quiz TTS Error]', err);
             setIsSpeaking(false);
             setPlaybackControls(null);
-            alert(err.message || 'Failed to synthesize speech.');
+            setTtsError(err.message || 'Failed to synthesize speech.');
+            setTimeout(() => setTtsError(null), 3000);
           }
         );
         setPlaybackControls(controls);
       } catch (err: any) {
-        alert(err.message || 'Failed to synthesize speech.');
+        setTtsError(err.message || 'Failed to synthesize speech.');
+        setTimeout(() => setTtsError(null), 3000);
       }
     }
   };
@@ -529,19 +532,19 @@ export const QuizPage: React.FC = () => {
 
       // Update Student Profile (XP, levels) in Zustand store + IndexedDB
       const currentXP = studentProfile.xpTotal + totalXP;
-      const nextLevelThreshold = studentProfile.level * 1000;
-      let newLevel = studentProfile.level;
-      if (currentXP >= nextLevelThreshold) {
-        newLevel += 1;
-      }
+      // Use xpToLevel utility for consistent level calculation
+      const { level: newLevel } = xpToLevel(currentXP);
 
-      // Simple streak update (could check dates)
+      // Streak update using midnight-based comparison to avoid DST issues
       let currentStreak = studentProfile.streakCurrent;
-      const today = new Date().toDateString();
-      if (studentProfile.lastStudyDate !== today) {
-        currentStreak = (studentProfile.lastStudyDate === new Date(Date.now() - 86400000).toDateString())
-          ? currentStreak + 1
-          : 1;
+      const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD UTC
+      const lastStudyStr = studentProfile.lastStudyDate;
+      if (lastStudyStr !== todayStr) {
+        // Check if last study was yesterday (86400000ms = 1 day, but compare date-strings)
+        const yesterday = new Date();
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        currentStreak = lastStudyStr === yesterdayStr ? currentStreak + 1 : 1;
       }
 
       const updatedProfile = {
@@ -549,7 +552,8 @@ export const QuizPage: React.FC = () => {
         xpTotal: currentXP,
         level: newLevel,
         streakCurrent: currentStreak,
-        lastStudyDate: today,
+        streakBest: Math.max(studentProfile.streakBest || 0, currentStreak),
+        lastStudyDate: new Date().toISOString().split('T')[0],
         // Adapt difficulty level slightly
         difficultyLevel: Math.max(0.1, Math.min(0.9, studentProfile.difficultyLevel + (scorePct > 0.8 ? 0.05 : scorePct < 0.5 ? -0.05 : 0)))
       };
@@ -776,6 +780,11 @@ export const QuizPage: React.FC = () => {
           <span>{formatTime(secondsElapsed)}</span>
         </div>
       </div>
+      {ttsError && (
+        <div className="toast-notification toast-notification--error" role="alert" style={{ margin: '0 var(--sp-4) var(--sp-2)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-2) var(--sp-3)', background: 'var(--color-error)', color: '#fff', fontSize: 'var(--fs-caption)' }}>
+          🔇 {ttsError}
+        </div>
+      )}
 
       <div className="quiz-progress">
         <div className="quiz-progress__meta">

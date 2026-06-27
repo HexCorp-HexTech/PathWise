@@ -47,7 +47,10 @@ export const StudentDashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchProgress = async () => {
-      if (!studentProfile) return;
+      if (!studentProfile) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
 
       // Pre-seed demo data in database if student-aarav-001 has no attempts
@@ -144,13 +147,17 @@ export const StudentDashboard: React.FC = () => {
           if (maxScore >= 0.8) {
             completed++;
           }
-          // Mastery is defined by BKT record or highest quiz score
-          const bktRecord = await db.bktMastery
-            .where('[userId+chapterId+skillId]')
-            .equals([studentProfile.userId, ch.id, ch.id])
-            .first();
+          const bktRecords = await db.bktMastery
+            .where('userId')
+            .equals(studentProfile.userId)
+            .and(b => b.chapterId === ch.id)
+            .toArray();
 
-          const chMastery = bktRecord ? bktRecord.pKnow : maxScore;
+          let chMastery = maxScore;
+          if (bktRecords.length > 0) {
+            const sumKnow = bktRecords.reduce((sum, r) => sum + r.pKnow, 0);
+            chMastery = sumKnow / bktRecords.length;
+          }
           sumMastery += chMastery;
 
           // Check if it represents a weakness
