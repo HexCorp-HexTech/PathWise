@@ -361,11 +361,15 @@ export const ChapterView: React.FC = () => {
 
         if (notesRecord) {
           const lowerContent = notesRecord.content.toLowerCase();
-          // Check actual Hindi character presence vs language setting
+          // Invalidate language mismatch, generic filler, and previously-poisoned offline stubs
           const hasHindiChars = /[\u0900-\u097F]/.test(notesRecord.content);
           const isLangMismatch = (language === 'hi' && !hasHindiChars) || (language === 'en' && hasHindiChars);
-          if (isLangMismatch || lowerContent.includes('general constant ratio') || lowerContent.includes('essential academic principles')) {
-            console.log(`[ChapterView] Invalidation triggered (lang=${language}, hindiChars=${hasHindiChars}). Clearing notes cache for: ${chapter.id}`);
+          const isStaleStub = lowerContent.includes('temporarily unavailable') ||
+            lowerContent.includes('general constant ratio') ||
+            lowerContent.includes('essential academic principles') ||
+            lowerContent.includes('सामग्री अभी उपलब्ध नहीं');
+          if (isLangMismatch || isStaleStub) {
+            console.log(`[ChapterView] Invalidating stale/stub cache for: ${chapter.id} (lang=${language}, stub=${isStaleStub})`);
             await db.notes.delete(notesRecord.id);
             await db.quizQuestions.where('chapterId').equals(chapter.id).delete();
             await db.flashcards.where('chapterId').equals(chapter.id).delete();
@@ -383,81 +387,76 @@ export const ChapterView: React.FC = () => {
         }
 
         if (isCustom && !notesRecord) {
-          console.log(`[ChapterView] Fetching custom chapter content via API for: ${chapter.id}`);
-          try {
-            const res = await fetch('/api/generate-chapter-content', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chapterId: chapter.id,
-                title: chapter.title,
-                description: chapter.description,
-                learningObjectives: chapter.learningObjectives,
-                board: subject?.board || 'CBSE',
-                grade: subject?.grade || 10,
-                subject: subject?.name || 'Mathematics',
-                lang: language
-              })
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              rawData = data;
-
-              const markdownContent = convertAiJsonToMarkdown(data, chapter.title, subject?.name || 'Mathematics', subject?.board || 'CBSE', subject?.grade || 10);
-
-              notesRecord = {
-                id: `${chapter.id}_notes`,
-                chapterId: chapter.id,
-                content: markdownContent,
-                generatedBy: 'ai',
-                version: 1,
-                createdAt: Date.now()
-              };
-              (notesRecord as any).rawJson = JSON.stringify(data);
-
-              await db.notes.put(notesRecord);
-              setNotes({ id: notesRecord.id, content: markdownContent });
-
-              if (data.quizQuestions && data.quizQuestions.length > 0) {
-                const mappedQs = data.quizQuestions.map((q: any, i: number) => ({
-                  ...q,
-                  id: `${chapter.id}_q_${i}`,
+          // If browser reports offline, skip the network call and go straight to the
+          // local AI engine — never poison the DB cache with an error stub.
+          if (!navigator.onLine) {
+            console.log(`[ChapterView] Offline detected — skipping API, using local engine for: ${chapter.id}`);
+            // Fall through to the non-custom (local engine) path below
+          } else {
+            console.log(`[ChapterView] Fetching custom chapter content via API for: ${chapter.id}`);
+            try {
+              const res = await fetch('/api/generate-chapter-content', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                   chapterId: chapter.id,
-                  tags: q.tags || [chapter.id]
-                }));
-                await db.quizQuestions.bulkPut(mappedQs);
-              }
+                  title: chapter.title,
+                  description: chapter.description,
+                  learningObjectives: chapter.learningObjectives,
+                  board: subject?.board || 'CBSE',
+                  grade: subject?.grade || 10,
+                  subject: subject?.name || 'Mathematics',
+                  lang: language
+                })
+              });
 
-              if (data.flashcards && data.flashcards.length > 0) {
-                const mappedFcs = data.flashcards.map((fc: any, i: number) => ({
-                  ...fc,
-                  id: `${chapter.id}_fc_${i}`,
+              if (res.ok) {
+                const data = await res.json();
+                rawData = data;
+
+                const markdownContent = convertAiJsonToMarkdown(data, chapter.title, subject?.name || 'Mathematics', subject?.board || 'CBSE', subject?.grade || 10);
+
+                notesRecord = {
+                  id: `${chapter.id}_notes`,
                   chapterId: chapter.id,
-                  chapterHash: `${chapter.title}_${language}_${markdownContent.length}`
-                }));
-                await db.flashcards.bulkPut(mappedFcs);
+                  content: markdownContent,
+                  generatedBy: 'ai',
+                  version: 1,
+                  createdAt: Date.now()
+                };
+                (notesRecord as any).rawJson = JSON.stringify(data);
+
+                await db.notes.put(notesRecord);
+                setNotes({ id: notesRecord.id, content: markdownContent });
+
+                if (data.quizQuestions && data.quizQuestions.length > 0) {
+                  const mappedQs = data.quizQuestions.map((q: any, i: number) => ({
+                    ...q,
+                    id: `${chapter.id}_q_${i}`,
+                    chapterId: chapter.id,
+                    tags: q.tags || [chapter.id]
+                  }));
+                  await db.quizQuestions.bulkPut(mappedQs);
+                }
+
+                if (data.flashcards && data.flashcards.length > 0) {
+                  const mappedFcs = data.flashcards.map((fc: any, i: number) => ({
+                    ...fc,
+                    id: `${chapter.id}_fc_${i}`,
+                    chapterId: chapter.id,
+                    chapterHash: `${chapter.title}_${language}_${markdownContent.length}`
+                  }));
+                  await db.flashcards.bulkPut(mappedFcs);
+                }
+              } else {
+                console.error('[ChapterView] Failed to generate custom chapter content.');
+                // ⚠️ Do NOT save a stub to IndexedDB — let the local engine handle it below
+                // (notesRecord remains undefined; falls through to local engine path)
               }
-            } else {
-              console.error('[ChapterView] Failed to generate custom chapter content.');
-              throw new Error('Failed to generate custom chapter content');
+            } catch (fetchErr) {
+              console.warn('[ChapterView] Network/API error fetching custom content. Using local engine fallback.', fetchErr);
+              // ⚠️ Do NOT save a stub to IndexedDB — fall through to local engine path
             }
-          } catch (fetchErr) {
-            console.error('[ChapterView] Network/API error fetching custom content. Using offline fallback...', fetchErr);
-            const fallbackContent = language === 'hi'
-              ? `# ${chapter.title}\n\nसामग्री अभी उपलब्ध नहीं है क्योंकि आप ऑफ़लाइन हैं या सर्वर अनुपलब्ध है।\n\n## विवरण\n${chapter.description}`
-              : `# ${chapter.title}\n\nContent is temporarily unavailable because you are offline or the service is down.\n\n## Description\n${chapter.description}`;
-
-            notesRecord = {
-              id: `${chapter.id}_notes`,
-              chapterId: chapter.id,
-              content: fallbackContent,
-              generatedBy: 'ai' as const,
-              version: 1,
-              createdAt: Date.now()
-            };
-            await db.notes.put(notesRecord);
-            setNotes({ id: notesRecord!.id, content: fallbackContent });
           }
         }
 

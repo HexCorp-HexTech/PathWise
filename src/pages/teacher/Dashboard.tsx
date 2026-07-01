@@ -2,7 +2,7 @@
    VIDYA AI — Teacher Dashboard
    ============================================ */
 import React from 'react';
-import { Users, TrendingUp, MessageSquare, AlertTriangle, BarChart3, Lightbulb, CheckSquare, HelpCircle, FileText, Clipboard } from 'lucide-react';
+import { Users, TrendingUp, MessageSquare, AlertTriangle, BarChart3, Lightbulb, CheckSquare, HelpCircle } from 'lucide-react';
 import { Card, StatCard } from '../../components/ui/Card';
 import { ProgressBar } from '../../components/ui/Progress';
 import { useAuthStore } from '../../store/authStore';
@@ -29,8 +29,9 @@ export const TeacherDashboard: React.FC = () => {
   const [classroomStudents, setClassroomStudents] = useState<{ id: string; name: string; avatarId: string; mastery: number; streak: number; riskLevel: 'low' | 'medium' | 'high'; classCode: string }[]>([]);
   const [dbChapters, setDbChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
-  // Subject performance computed from real student quiz data
   const [subjectPerf, setSubjectPerf] = useState<{ name: string; score: number; color: string }[]>([]);
+  const [activeToday, setActiveToday] = useState(0);
+  const [recentActivity, setRecentActivity] = useState<{ type: string; text: string; time: string; icon: React.ReactNode }[]>([]);
 
   useEffect(() => {
     const fetchClassData = async () => {
@@ -62,6 +63,57 @@ export const TeacherDashboard: React.FC = () => {
           }
         }
         setClassroomStudents(studentsList);
+
+        // ── Real active-today count (students with a study session today) ──
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const todayTs = todayStart.getTime();
+        let activeTodayCount = 0;
+        const activityItems: { type: string; text: string; time: string; icon: React.ReactNode }[] = [];
+
+        for (const st of studentsList) {
+          const sessions = await db.studySessions.where('userId').equals(st.id).toArray();
+          const todaySessions = sessions.filter(s => (s.startedAt || 0) >= todayTs);
+          if (todaySessions.length > 0) activeTodayCount++;
+
+          // Most recent quiz attempt for activity feed
+          const attempts = await db.quizAttempts.where('userId').equals(st.id).toArray();
+          const recent = attempts.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0))[0];
+          if (recent) {
+            const minsAgo = Math.round((Date.now() - (recent.startedAt || 0)) / 60000);
+            if (minsAgo < 1440) { // within last 24h
+              activityItems.push({
+                type: 'quiz',
+                text: `${st.name} completed a quiz`,
+                time: minsAgo < 60 ? `${minsAgo} min ago` : `${Math.round(minsAgo / 60)} hr ago`,
+                icon: <CheckSquare size={16} color="var(--color-success)" />
+              });
+            }
+          }
+        }
+
+        // Add doubt room activity
+        const doubts = await db.doubtPosts.where('status').equals('open').toArray();
+        if (doubts.length > 0) {
+          activityItems.push({
+            type: 'doubt',
+            text: `${doubts.length} open question${doubts.length > 1 ? 's' : ''} in Doubt Room`,
+            time: 'pending',
+            icon: <HelpCircle size={16} color="var(--color-warning)" />
+          });
+        }
+
+        // Sort by recency (most recent first) and cap
+        activityItems.sort((a, b) => {
+          const parseTime = (t: string) => {
+            const m = t.match(/(\d+)\s*(min|hr)/);
+            if (!m) return 9999;
+            return parseInt(m[1]) * (m[2] === 'hr' ? 60 : 1);
+          };
+          return parseTime(a.time) - parseTime(b.time);
+        });
+
+        setActiveToday(activeTodayCount);
+        setRecentActivity(activityItems.slice(0, 5));
 
         if (teacherProfile && teacherProfile.subjects && teacherProfile.subjects.length > 0) {
           const subjId = teacherProfile.subjects[0];
@@ -142,17 +194,8 @@ export const TeacherDashboard: React.FC = () => {
 
   // Class-level analytics
   const totalStudents = classroomStudents.length;
-  const activeToday = Math.round(totalStudents * 0.75);
   const avgScore = totalStudents > 0 ? Math.round(classroomStudents.reduce((sum, st) => sum + st.mastery, 0) / totalStudents * 100) : 0;
   const atRisk = classroomStudents.filter(s => s.riskLevel === 'high').length;
-
-  // Recent activity
-  const recentActivity = [
-    { type: 'quiz', text: `${classroomStudents[0]?.name || 'Student'} completed homework quiz`, time: '10 min ago', icon: <CheckSquare size={16} color="var(--color-success)" /> },
-    { type: 'chat', text: `${classroomStudents[1]?.name || 'Student'} reviewed smart flashcards`, time: '25 min ago', icon: <FileText size={16} color="var(--color-primary)" /> },
-    { type: 'doubt', text: 'New classroom question posted in Doubt Room', time: '1 hour ago', icon: <HelpCircle size={16} color="var(--color-warning)" /> },
-    { type: 'achievement', text: 'New assignment created by you', time: '2 hours ago', icon: <Clipboard size={16} color="var(--color-secondary)" /> },
-  ];
 
   // Top performers
   const topPerformers = [...classroomStudents]

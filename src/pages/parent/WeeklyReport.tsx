@@ -9,7 +9,7 @@ import { Card } from '../../components/ui/Card';
 import { ProgressBar } from '../../components/ui/Progress';
 import { Button } from '../../components/ui/Button';
 import { db } from '../../lib/db';
-import { DEMO_STUDENT } from '../../data/seed';
+import { useNavigate } from 'react-router-dom';
 import type { User, StudentProfile } from '../../types';
 
 interface SubjectProgressItem {
@@ -28,17 +28,30 @@ export const WeeklyReportPage: React.FC = () => {
   const [weaknesses, setWeaknesses] = useState<string[]>([]);
   const [dailyStudy, setDailyStudy] = useState<{ day: string; minutes: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [noChildLinked, setNoChildLinked] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchChildProgress = async () => {
       setLoading(true);
-      const childId = localStorage.getItem('parent_active_child_id') || 'student-aarav-001';
+      const childId = localStorage.getItem('parent_active_child_id');
+      if (!childId) {
+        setNoChildLinked(true);
+        setLoading(false);
+        return;
+      }
       try {
         const u = await db.users.get(childId);
         const p = await db.studentProfiles.get(childId);
-        
-        const activeUser = u || DEMO_STUDENT.user;
-        const activeProfile = p || DEMO_STUDENT.profile;
+
+        if (!u || !p) {
+          setNoChildLinked(true);
+          setLoading(false);
+          return;
+        }
+
+        const activeUser = u;
+        const activeProfile = p;
 
         setChildUser(activeUser);
         setChildProfile(activeProfile);
@@ -122,9 +135,8 @@ export const WeeklyReportPage: React.FC = () => {
         setDailyStudy(chartData);
 
       } catch (err) {
-        console.error('Failed to load parent weekly report data', err);
-        setChildUser(DEMO_STUDENT.user);
-        setChildProfile(DEMO_STUDENT.profile);
+        console.error('[WeeklyReport] Failed to load data:', err);
+        setNoChildLinked(true);
       } finally {
         setLoading(false);
       }
@@ -154,6 +166,21 @@ export const WeeklyReportPage: React.FC = () => {
       <div className="pdash" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
         <RefreshCw className="animate-spin" size={32} color="var(--color-primary)" />
         <p style={{ marginLeft: 'var(--sp-2)' }}>Loading weekly report data...</p>
+      </div>
+    );
+  }
+
+  if (noChildLinked) {
+    return (
+      <div className="pdash" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 'var(--sp-4)', textAlign: 'center', padding: 'var(--sp-8)' }}>
+        <Award size={64} color="var(--color-text-secondary)" style={{ opacity: 0.4 }} />
+        <h2 style={{ color: 'var(--color-text-primary)', fontSize: 'var(--fs-h2)', fontWeight: 700 }}>No Child Linked</h2>
+        <p style={{ color: 'var(--color-text-secondary)', maxWidth: '360px', lineHeight: 1.6 }}>
+          Log in with your child's Student Access Code to view their weekly progress report.
+        </p>
+        <Button variant="primary" onClick={() => navigate('/auth/parent/login')}>
+          Link Child Account
+        </Button>
       </div>
     );
   }

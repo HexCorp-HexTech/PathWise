@@ -1,0 +1,16 @@
+{
+  "name": "PathWise",
+  "short_name": "PathWise",
+  "description": "Adaptive offline-first learning platform powered by Bayesian AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F0F1A",
+  "theme_color": "#6C63FF",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -16,14 +16,7 @@ import { AvatarIcon } from '../../components/ui/AvatarIcon';
 import { computeStudentMastery } from '../../lib/compute-mastery';
 import './Students.css';
 
-function getDeterministicOffset(str1: string, str2: string): number {
-  let hash = 0;
-  const combined = str1 + str2;
-  for (let i = 0; i < combined.length; i++) {
-    hash = combined.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return (Math.abs(hash) % 100) / 1000 - 0.05;
-}
+
 
 interface StudentData {
   id: string;
@@ -33,6 +26,8 @@ interface StudentData {
   streak: number;
   riskLevel: 'low' | 'medium' | 'high';
   classCode: string;
+  grade?: number;
+  board?: string;
 }
 
 export const StudentsPage: React.FC = () => {
@@ -68,7 +63,9 @@ export const StudentsPage: React.FC = () => {
               mastery,
               streak: cp.streakCurrent || 0,
               riskLevel: riskLevel as 'low' | 'medium' | 'high',
-              classCode: activeCode
+              classCode: activeCode,
+              grade: cp.grade,
+              board: cp.board
             });
           }
         }
@@ -116,21 +113,106 @@ export const StudentsPage: React.FC = () => {
     }, 4000);
   };
 
-  // Student details subject breakdown (simulated)
-  const getSubjectScores = (student: StudentData) => {
-    const base = student.mastery;
-    return [
-      { name: 'Mathematics', score: Math.round(Math.max(0.3, Math.min(1, base + getDeterministicOffset(student.id, 'Mathematics'))) * 100), color: '#FF6B6B' },
-      { name: 'Science', score: Math.round(Math.max(0.3, Math.min(1, base + getDeterministicOffset(student.id, 'Science'))) * 100), color: '#4ECDC4' },
-      { name: 'English', score: Math.round(Math.max(0.3, Math.min(1, base + getDeterministicOffset(student.id, 'English'))) * 100), color: '#45B7D1' },
-      { name: 'Hindi', score: Math.round(Math.max(0.3, Math.min(1, base + getDeterministicOffset(student.id, 'Hindi'))) * 100), color: '#F7DC6F' },
-      { name: 'Social Science', score: Math.round(Math.max(0.3, Math.min(1, base + getDeterministicOffset(student.id, 'Social Science'))) * 100), color: '#BB8FCE' },
-    ];
-  };
+  const [subjectScores, setSubjectScores] = useState<{ name: string; score: number; color: string }[]>([]);
+  const [strongConcepts, setStrongConcepts] = useState<string[]>([]);
+  const [practiceConcepts, setPracticeConcepts] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!selectedStudent) return;
+    const fetchStudentMetrics = async () => {
+      try {
+        const allSubjects = await db.subjects.toArray();
+        const scores: { name: string; score: number; color: string }[] = [];
+        
+        for (const subj of allSubjects) {
+          const chapters = await db.chapters.where('subjectId').equals(subj.id).toArray();
+          if (chapters.length === 0) continue;
+
+          let studentSubjScore = 0;
+          let studentChapCount = 0;
+          for (const ch of chapters) {
+            const bktRecords = await db.bktMastery
+              .where('userId').equals(selectedStudent.id)
+              .and(r => r.chapterId === ch.id)
+              .toArray();
+            if (bktRecords.length > 0) {
+              const avgBkt = bktRecords.reduce((s, r) => s + r.pKnow, 0) / bktRecords.length;
+              studentSubjScore += avgBkt * 100;
+              studentChapCount++;
+            } else {
+              const attempts = await db.quizAttempts
+                .where('userId').equals(selectedStudent.id)
+                .and(a => a.chapterId === ch.id)
+                .toArray();
+              if (attempts.length > 0) {
+                const maxScore = Math.max(...attempts.map(a => {
+                  const sc = a.score ?? 0;
+                  return sc > 1 ? sc : sc * 100;
+                }));
+                studentSubjScore += maxScore;
+                studentChapCount++;
+              }
+            }
+          }
+          const scoreVal = studentChapCount > 0 ? Math.round(studentSubjScore / studentChapCount) : 0;
+          scores.push({
+            name: subj.name,
+            score: scoreVal,
+            color: subj.color || '#4ECDC4'
+          });
+        }
+        setSubjectScores(scores);
+
+        // Fetch BKT strong vs practice concepts
+        const allChapters = await db.chapters.toArray();
+        const strongList: string[] = [];
+        const practiceList: string[] = [];
+
+        for (const ch of allChapters) {
+          const bkt = await db.bktMastery
+            .where('userId').equals(selectedStudent.id)
+            .and(r => r.chapterId === ch.id)
+            .toArray();
+          if (bkt.length > 0) {
+            const avg = bkt.reduce((s, r) => s + r.pKnow, 0) / bkt.length;
+            if (avg >= 0.75) {
+              strongList.push(ch.title);
+            } else if (avg < 0.6) {
+              practiceList.push(ch.title);
+            }
+          } else {
+            // Check quiz scores for that chapter
+            const attempts = await db.quizAttempts
+              .where('userId').equals(selectedStudent.id)
+              .and(a => a.chapterId === ch.id)
+              .toArray();
+            if (attempts.length > 0) {
+              const maxScore = Math.max(...attempts.map(a => a.score ?? 0));
+              const pct = maxScore > 1 ? maxScore / 100 : maxScore;
+              if (pct >= 0.75) {
+                strongList.push(ch.title);
+              } else if (pct > 0 && pct < 0.6) {
+                practiceList.push(ch.title);
+              }
+            }
+          }
+        }
+
+        if (strongList.length === 0) strongList.push('No concepts fully mastered yet.');
+        if (practiceList.length === 0) practiceList.push('No urgent concept gaps detected.');
+
+        setStrongConcepts(strongList);
+        setPracticeConcepts(practiceList);
+
+      } catch (err) {
+        console.error('Failed to load student details metrics', err);
+      }
+    };
+    fetchStudentMetrics();
+  }, [selectedStudent]);
 
   // Render detail sub-view
   if (selectedStudent) {
-    const subjectScores = getSubjectScores(selectedStudent);
 
     return (
       <div className="tstudents">
@@ -164,7 +246,7 @@ export const StudentsPage: React.FC = () => {
                 </span>
                 <div>
                   <h2 className="student-detail__name">{selectedStudent.name}</h2>
-                  <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--fs-body-sm)' }}>Grade 7 • Section A</span>
+                  <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--fs-body-sm)' }}>Grade {selectedStudent.grade || 10} • {selectedStudent.board || 'CBSE'}</span>
                 </div>
               </div>
 
@@ -192,8 +274,8 @@ export const StudentsPage: React.FC = () => {
             </div>
 
             <h3 style={{ fontSize: 'var(--fs-h4)', fontWeight: 800, marginBottom: 'var(--sp-4)' }}>Subject Mastery</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)', marginBottom: 'var(--sp-8)' }}>
-              {subjectScores.map(score => (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)', marginBottom: 'var(--sp-8)' }}>
+              {subjectScores.map((score: { name: string; score: number; color: string }) => (
                 <div key={score.name} className="student-detail__subject-row">
                   <span className="student-detail__subject-label">{score.name}</span>
                   <div className="student-detail__subject-progress">
@@ -208,12 +290,12 @@ export const StudentsPage: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)', marginBottom: 'var(--sp-8)' }}>
               <div style={{ padding: 'var(--sp-3)', background: 'rgba(0, 184, 124, 0.05)', borderLeft: '4px solid var(--color-success)', borderRadius: 'var(--radius-sm)' }}>
                 <h4 style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-body-sm)', color: 'var(--color-success)', marginBottom: 'var(--sp-1)' }}>Strong Concepts</h4>
-                <p style={{ fontSize: 'var(--fs-body-sm)', color: 'var(--color-text-secondary)' }}>Fractions addition, Newtonian gravity equations, simple present tense rules.</p>
+                <p style={{ fontSize: 'var(--fs-body-sm)', color: 'var(--color-text-secondary)' }}>{strongConcepts.join(', ')}</p>
               </div>
 
               <div style={{ padding: 'var(--sp-3)', background: 'rgba(217, 48, 37, 0.05)', borderLeft: '4px solid var(--color-error)', borderRadius: 'var(--radius-sm)' }}>
                 <h4 style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-body-sm)', color: 'var(--color-error)', marginBottom: 'var(--sp-1)' }}>Areas for Practice</h4>
-                <p style={{ fontSize: 'var(--fs-body-sm)', color: 'var(--color-text-secondary)' }}>Linear equations step substitutions, cells structure nomenclature.</p>
+                <p style={{ fontSize: 'var(--fs-body-sm)', color: 'var(--color-text-secondary)' }}>{practiceConcepts.join(', ')}</p>
               </div>
             </div>
 
@@ -314,7 +396,7 @@ export const StudentsPage: React.FC = () => {
                   <Flame size={14} color="#FF6B6B" /> {student.streak} days
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  Grade 7A
+                  Grade {student.grade || 10} • {student.board || 'CBSE'}
                 </div>
               </div>
             </Card>

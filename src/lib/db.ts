@@ -67,8 +67,15 @@ class PathwiseDatabase extends Dexie {
       voiceCache: 'id, text, voiceId',
       classrooms: 'id, teacherId',
     });
-  }
-}
+
+    // Version 2: add classCode index to studentProfiles for O(1) teacher queries
+    this.version(2).stores({
+      studentProfiles: 'userId, grade, board, classCode',
+    });
+  } // end constructor
+} // end class
+
+
 
 import { SUBJECTS, CHAPTERS, DEMO_CLASSROOMS, DEMO_STUDENT, DEMO_TEACHER, DEMO_STUDENTS } from '../data/seed';
 

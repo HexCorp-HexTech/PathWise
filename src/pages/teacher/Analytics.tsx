@@ -13,7 +13,10 @@ import { computeStudentMastery } from '../../lib/compute-mastery';
 export const AnalyticsPage: React.FC = () => {
   const { teacherProfile } = useAuthStore();
   const activeCode = teacherProfile?.activeClassroomCode || '';
-  const [classroomStudents, setClassroomStudents] = useState<{ name: string; avatarId: string; mastery: number; streak: number; riskLevel: 'low' | 'medium' | 'high'; classCode: string }[]>([]);
+  const [classroomStudents, setClassroomStudents] = useState<{ id: string; name: string; avatarId: string; mastery: number; streak: number; riskLevel: 'low' | 'medium' | 'high'; classCode: string }[]>([]);
+  const [subjectAverages, setSubjectAverages] = useState<{ name: string; score: number; color: string; studentsStruggling: number }[]>([]);
+  const [urgentConcepts, setUrgentConcepts] = useState<{ name: string; subject: string; avgScore: number; studentsAtRisk: number }[]>([]);
+  const [weeklyStudyHrs, setWeeklyStudyHrs] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,15 +30,15 @@ export const AnalyticsPage: React.FC = () => {
       try {
         const profiles = await db.studentProfiles.toArray();
         const classProfiles = profiles.filter(p => p.classCode === activeCode);
-        
-        const studentsList = [];
+
+        const studentsList: { id: string; name: string; avatarId: string; mastery: number; streak: number; riskLevel: 'low' | 'medium' | 'high'; classCode: string }[] = [];
         for (const cp of classProfiles) {
           const userRec = await db.users.get(cp.userId);
           if (userRec) {
             const mastery = await computeStudentMastery(cp.userId);
             const riskLevel = mastery >= 0.7 ? 'low' : mastery >= 0.5 ? 'medium' : 'high';
-            
             studentsList.push({
+              id: cp.userId,
               name: userRec.name,
               avatarId: userRec.avatarId || 'owl',
               mastery,
@@ -46,6 +49,114 @@ export const AnalyticsPage: React.FC = () => {
           }
         }
         setClassroomStudents(studentsList);
+
+        // ── Compute real subject averages from quiz attempts & BKT ──────────
+        const allSubjects = await db.subjects.toArray();
+        const studentIds = studentsList.map(s => s.id);
+        const computedSubjectAvgs: { name: string; score: number; color: string; studentsStruggling: number }[] = [];
+
+        for (const subj of allSubjects) {
+          const chapters = await db.chapters.where('subjectId').equals(subj.id).toArray();
+          if (chapters.length === 0) continue;
+
+          let totalScore = 0;
+          let totalCount = 0;
+          let studentsStruggling = 0;
+
+          for (const st of studentIds) {
+            let studentSubjScore = 0;
+            let studentChapCount = 0;
+            for (const ch of chapters) {
+              // Use BKT mastery first, fall back to quiz attempt score
+              const bktRecords = await db.bktMastery
+                .where('userId').equals(st)
+                .and(r => r.chapterId === ch.id)
+                .toArray();
+              if (bktRecords.length > 0) {
+                const avgBkt = bktRecords.reduce((s, r) => s + r.pKnow, 0) / bktRecords.length;
+                studentSubjScore += avgBkt * 100;
+                studentChapCount++;
+              } else {
+                const attempts = await db.quizAttempts
+                  .where('userId').equals(st)
+                  .and(a => a.chapterId === ch.id)
+                  .toArray();
+                if (attempts.length > 0) {
+                  const maxScore = Math.max(...attempts.map(a => {
+                    const sc = a.score ?? 0;
+                    return sc > 1 ? sc : sc * 100;
+                  }));
+                  studentSubjScore += maxScore;
+                  studentChapCount++;
+                }
+              }
+            }
+            if (studentChapCount > 0) {
+              const avg = studentSubjScore / studentChapCount;
+              totalScore += avg;
+              totalCount++;
+              if (avg < 60) studentsStruggling++;
+            }
+          }
+
+          if (totalCount > 0) {
+            computedSubjectAvgs.push({
+              name: subj.name,
+              score: Math.round(totalScore / totalCount),
+              color: subj.color || '#4ECDC4',
+              studentsStruggling
+            });
+          }
+        }
+        // Sort descending score, cap to 6 subjects
+        computedSubjectAvgs.sort((a, b) => b.score - a.score);
+        setSubjectAverages(computedSubjectAvgs.slice(0, 6));
+
+        // ── Compute urgent concepts (chapters with lowest avg BKT mastery) ──
+        const allChapters = await db.chapters.toArray();
+        const chapterScores: { name: string; subject: string; avgScore: number; studentsAtRisk: number }[] = [];
+
+        for (const ch of allChapters) {
+          const subj = allSubjects.find(s => s.id === ch.subjectId);
+          if (!subj) continue;
+          let total = 0;
+          let count = 0;
+          let atRisk = 0;
+          for (const st of studentIds) {
+            const bkt = await db.bktMastery
+              .where('userId').equals(st)
+              .and(r => r.chapterId === ch.id)
+              .toArray();
+            if (bkt.length > 0) {
+              const avg = bkt.reduce((s, r) => s + r.pKnow, 0) / bkt.length * 100;
+              total += avg;
+              count++;
+              if (avg < 60) atRisk++;
+            }
+          }
+          if (count > 0) {
+            chapterScores.push({
+              name: ch.title,
+              subject: subj.name,
+              avgScore: Math.round(total / count),
+              studentsAtRisk: atRisk
+            });
+          }
+        }
+        // Pick chapters with lowest average mastery
+        chapterScores.sort((a, b) => a.avgScore - b.avgScore);
+        setUrgentConcepts(chapterScores.slice(0, 5).filter(c => c.avgScore < 75));
+
+        // ── Compute weekly study hours from real study sessions ─────────────
+        const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+        let totalSecs = 0;
+        for (const st of studentIds) {
+          const sessions = await db.studySessions.where('userId').equals(st).toArray();
+          const weekSessions = sessions.filter(s => (s.startedAt || 0) > weekAgo);
+          totalSecs += weekSessions.reduce((sum, s) => sum + (s.durationSec || 0), 0);
+        }
+        setWeeklyStudyHrs(Math.round((totalSecs / 3600) * 10) / 10);
+
       } catch (err) {
         console.error('Failed to load students in analytics', err);
       } finally {
@@ -69,21 +180,7 @@ export const AnalyticsPage: React.FC = () => {
     );
   }
 
-  // Chart data (simulated subject average score)
-  const subjectAverages = [
-    { name: 'Mathematics', score: 68, color: '#FF6B6B', studentsStruggling: 4 },
-    { name: 'Science', score: 81, color: '#4ECDC4', studentsStruggling: 1 },
-    { name: 'English', score: 76, color: '#45B7D1', studentsStruggling: 2 },
-    { name: 'Hindi', score: 65, color: '#F7DC6F', studentsStruggling: 5 },
-    { name: 'Social Science', score: 72, color: '#BB8FCE', studentsStruggling: 3 },
-  ];
 
-  // Urgent revision concepts (simulated)
-  const urgentConcepts = [
-    { name: 'Linear Equations', subject: 'Math', avgScore: 48, studentsAtRisk: 6 },
-    { name: 'Acids, Bases, and Salts', subject: 'Science', avgScore: 59, studentsAtRisk: 4 },
-    { name: 'Rachna (Hindi Composition)', subject: 'Hindi', avgScore: 61, studentsAtRisk: 5 },
-  ];
 
   return (
     <div className="tdash" style={{ maxWidth: '1000px', margin: '0 auto', padding: 'var(--sp-6)' }}>
@@ -111,8 +208,8 @@ export const AnalyticsPage: React.FC = () => {
             <span style={{ fontSize: 'var(--fs-body-sm)', fontWeight: 'var(--fw-bold)' }}>Weekly Study Hours</span>
             <Clock size={16} color="#4ECDC4" />
           </div>
-          <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--color-text-primary)' }}>42.5 hrs</div>
-          <p style={{ fontSize: 'var(--fs-caption)', color: 'var(--color-text-tertiary)', marginTop: 'var(--sp-1)' }}>Avg 3.5 hrs per student</p>
+          <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--color-text-primary)' }}>{weeklyStudyHrs} hrs</div>
+          <p style={{ fontSize: 'var(--fs-caption)', color: 'var(--color-text-tertiary)', marginTop: 'var(--sp-1)' }}>Across {classroomStudents.length} students this week</p>
         </Card>
 
         <Card style={{ padding: 'var(--sp-5)', borderLeft: '4px solid var(--color-error)' }}>

@@ -7,7 +7,7 @@ import { ProgressBar } from '../../components/ui/Progress';
 import { Clock, TrendingUp, Flame, Award, Share2, BookOpen, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { db } from '../../lib/db';
-import { DEMO_STUDENT } from '../../data/seed';
+import { useNavigate } from 'react-router-dom';
 import type { User, StudentProfile } from '../../types';
 import './ParentDashboard.css';
 
@@ -18,6 +18,7 @@ interface SubjectProgressItem {
 }
 
 export const ParentDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [childUser, setChildUser] = useState<User | null>(null);
   const [childProfile, setChildProfile] = useState<StudentProfile | null>(null);
   const [subjectsProgress, setSubjectsProgress] = useState<SubjectProgressItem[]>([]);
@@ -27,6 +28,7 @@ export const ParentDashboard: React.FC = () => {
   const [weaknesses, setWeaknesses] = useState<string[]>([]);
   const [classStrength, setClassStrength] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [noChildLinked, setNoChildLinked] = useState(false);
 
   // Daily study times chart values
   const [dailyStudy, setDailyStudy] = useState<{ day: string; minutes: number }[]>([]);
@@ -34,13 +36,25 @@ export const ParentDashboard: React.FC = () => {
   useEffect(() => {
     const fetchChildProgress = async () => {
       setLoading(true);
-      const childId = localStorage.getItem('parent_active_child_id') || 'student-aarav-001';
+      const childId = localStorage.getItem('parent_active_child_id');
+      if (!childId) {
+        setNoChildLinked(true);
+        setLoading(false);
+        return;
+      }
       try {
         const u = await db.users.get(childId);
         const p = await db.studentProfiles.get(childId);
-        
-        const activeUser = u || DEMO_STUDENT.user;
-        const activeProfile = p || DEMO_STUDENT.profile;
+
+        if (!u || !p) {
+          // Child ID stored but no matching record — may have been cleared
+          setNoChildLinked(true);
+          setLoading(false);
+          return;
+        }
+
+        const activeUser = u;
+        const activeProfile = p;
 
         setChildUser(activeUser);
         setChildProfile(activeProfile);
@@ -141,9 +155,8 @@ export const ParentDashboard: React.FC = () => {
         }
 
       } catch (err) {
-        console.error(err);
-        setChildUser(DEMO_STUDENT.user);
-        setChildProfile(DEMO_STUDENT.profile);
+        console.error('[ParentDashboard] Failed to load child data:', err);
+        setNoChildLinked(true);
       } finally {
         setLoading(false);
       }
@@ -173,6 +186,22 @@ export const ParentDashboard: React.FC = () => {
       <div className="pdash" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
         <RefreshCw className="animate-spin" size={32} color="var(--color-primary)" />
         <p style={{ marginLeft: 'var(--sp-2)' }}>Loading report data...</p>
+      </div>
+    );
+  }
+
+  if (noChildLinked) {
+    return (
+      <div className="pdash" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 'var(--sp-4)', textAlign: 'center', padding: 'var(--sp-8)' }}>
+        <BookOpen size={64} color="var(--color-text-secondary)" style={{ opacity: 0.4 }} />
+        <h2 style={{ color: 'var(--color-text-primary)', fontSize: 'var(--fs-h2)', fontWeight: 700 }}>No Child Linked</h2>
+        <p style={{ color: 'var(--color-text-secondary)', maxWidth: '360px', lineHeight: 1.6 }}>
+          To view your child's progress, log in using your child's Student Access Code.
+          You can find this code at the end of their student account setup.
+        </p>
+        <Button variant="primary" onClick={() => navigate('/auth/parent/login')}>
+          Link Child Account
+        </Button>
       </div>
     );
   }

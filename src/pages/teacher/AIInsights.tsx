@@ -1,44 +1,200 @@
 /* ============================================
    VIDYA AI — Teacher AI Insights Dashboard
    ============================================ */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Lightbulb, Sparkles, ArrowRight, ShieldAlert, Award } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
+import { db } from '../../lib/db';
+import { computeStudentMastery } from '../../lib/compute-mastery';
+
+interface InsightItem {
+  type: string;
+  title: string;
+  desc: string;
+  action: string;
+  route: string;
+  icon: React.ReactNode;
+  bg: string;
+}
 
 export const AIInsightsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user, teacherProfile } = useAuthStore();
+  const activeCode = teacherProfile?.activeClassroomCode || '';
 
-  const insights = [
-    {
-      type: 'warning',
-      title: 'Concept Block Detected',
-      desc: '7 students scored below 60% on the latest Linear Equations quiz. The difficulty adaptation curve suggests students are hitting a roadblock with step substitutions.',
-      action: 'Assign Revision Homework',
-      route: '/teacher/assignments',
-      icon: <ShieldAlert size={18} color="var(--color-error)" />,
-      bg: 'rgba(217, 48, 37, 0.03)'
-    },
-    {
-      type: 'success',
-      title: 'Optimal Retention',
-      desc: 'Class average retention rate on Force and Motion is currently estimated at 92%. The SM-2 spaced repetition schedules show high stability in short-term recalls.',
-      action: 'Create Extension Work',
-      route: '/teacher/content',
-      icon: <Award size={18} color="var(--color-success)" />,
-      bg: 'rgba(0, 184, 124, 0.03)'
-    },
-    {
-      type: 'suggestion',
-      title: 'Doubt Room Activity Spike',
-      desc: 'There are 3 unresolved queries in Tenses. We suggest reviewing simple past vs present perfect continuous rules in the next class.',
-      action: 'Go to Doubt Room',
-      route: '/teacher/doubts',
-      icon: <Lightbulb size={18} color="var(--color-warning)" />,
-      bg: 'rgba(244, 180, 0, 0.03)'
-    }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState<InsightItem[]>([]);
+  const [diagnosticText, setDiagnosticText] = useState('');
+
+  useEffect(() => {
+    const generateInsights = async () => {
+      setLoading(true);
+      try {
+        const studentProfiles = await db.studentProfiles.toArray();
+        const classProfiles = studentProfiles.filter(p => p.classCode === activeCode);
+        const studentIds = classProfiles.map(p => p.userId);
+
+        // Fetch chapters
+        const allChapters = await db.chapters.toArray();
+
+        // 1. Find Concept roadblock (lowest average chapter score < 70%)
+        let lowestChapter: any = null;
+        let lowestAvg = 100;
+        let strugglingCount = 0;
+
+        for (const ch of allChapters) {
+          let scoreSum = 0;
+          let count = 0;
+          let studentStruggles = 0;
+
+          for (const st of studentIds) {
+            const bkt = await db.bktMastery
+              .where('userId').equals(st)
+              .and(r => r.chapterId === ch.id)
+              .toArray();
+            let chapScore = 0;
+            let hasAttempt = false;
+
+            if (bkt.length > 0) {
+              chapScore = bkt.reduce((sum, r) => sum + r.pKnow, 0) / bkt.length * 100;
+              hasAttempt = true;
+            } else {
+              const attempts = await db.quizAttempts
+                .where('userId').equals(st)
+                .and(a => a.chapterId === ch.id)
+                .toArray();
+              if (attempts.length > 0) {
+                chapScore = Math.max(...attempts.map(a => (a.score ?? 0) > 1 ? a.score! : a.score! * 100));
+                hasAttempt = true;
+              }
+            }
+
+            if (hasAttempt) {
+              scoreSum += chapScore;
+              count++;
+              if (chapScore < 60) {
+                studentStruggles++;
+              }
+            }
+          }
+
+          if (count > 0) {
+            const avg = scoreSum / count;
+            if (avg < lowestAvg) {
+              lowestAvg = avg;
+              lowestChapter = ch;
+              strugglingCount = studentStruggles;
+            }
+          }
+        }
+
+        // 2. Class Average Mastery
+        let classAvgMastery = 0;
+        if (studentIds.length > 0) {
+          let totalMastery = 0;
+          for (const sid of studentIds) {
+            totalMastery += await computeStudentMastery(sid);
+          }
+          classAvgMastery = Math.round((totalMastery / studentIds.length) * 100);
+        }
+
+        // 3. Doubt Room queries count
+        const openDoubts = await db.doubtPosts.where('status').equals('open').toArray();
+        const classDoubts = openDoubts.filter(d => studentIds.includes(d.userId));
+
+        // Build Actionable Insights list
+        const list: InsightItem[] = [];
+
+        // Roadblock Insight
+        if (lowestChapter && lowestAvg < 70) {
+          list.push({
+            type: 'warning',
+            title: 'Concept Block Detected',
+            desc: `${strugglingCount} student${strugglingCount > 1 ? 's' : ''} scored below 60% on the latest '${lowestChapter.title}' quiz. The adaptation threshold suggests they are hitting a roadblock.`,
+            action: 'Assign Revision Homework',
+            route: '/teacher/assignments',
+            icon: <ShieldAlert size={18} color="var(--color-error)" />,
+            bg: 'rgba(217, 48, 37, 0.03)'
+          });
+        } else {
+          list.push({
+            type: 'warning',
+            title: 'Steady Progress',
+            desc: 'No major concept roadblocks detected across current quizzes. Keep monitoring adaptive pathways.',
+            action: 'Assign Practice Task',
+            route: '/teacher/assignments',
+            icon: <ShieldAlert size={18} color="var(--color-success)" />,
+            bg: 'rgba(0, 184, 124, 0.03)'
+          });
+        }
+
+        // Retention Rate Insight
+        const retentionPercent = classAvgMastery > 0 ? classAvgMastery : 75;
+        list.push({
+          type: 'success',
+          title: 'Retention Diagnostics',
+          desc: `Class average retention rate across assigned subjects is estimated at ${retentionPercent}%. Spaced repetition schedules (SM-2) show moderate recall stability.`,
+          action: 'View Class Curriculum',
+          route: '/teacher/analytics',
+          icon: <Award size={18} color="var(--color-success)" />,
+          bg: 'rgba(0, 184, 124, 0.03)'
+        });
+
+        // Doubt Room Insight
+        if (classDoubts.length > 0) {
+          list.push({
+            type: 'suggestion',
+            title: 'Doubt Room Active Queries',
+            desc: `There are ${classDoubts.length} unresolved student query/queries in the classroom Doubt Room. We suggest reviewing common topics in the next class session.`,
+            action: 'Go to Doubt Room',
+            route: '/teacher/doubts',
+            icon: <Lightbulb size={18} color="var(--color-warning)" />,
+            bg: 'rgba(244, 180, 0, 0.03)'
+          });
+        } else {
+          list.push({
+            type: 'suggestion',
+            title: 'All Doubts Resolved',
+            desc: 'Great! All doubt queries raised by students in your classroom have been answered.',
+            action: 'Visit Doubt Room',
+            route: '/teacher/doubts',
+            icon: <Lightbulb size={18} color="var(--color-success)" />,
+            bg: 'rgba(0, 184, 124, 0.03)'
+          });
+        }
+
+        setInsights(list);
+
+        // Build Diagnostic text
+        const teacherName = user?.name || 'Instructor';
+        let diag = `Hello ${teacherName}! Overall class mastery average is sitting at ${classAvgMastery}%. `;
+        if (lowestChapter && lowestAvg < 70) {
+          diag += `Special focus is recommended for '${lowestChapter.title}', where Bayesian Knowledge Tracing (BKT) indicates mastery probability is hovering below target thresholds.`;
+        } else {
+          diag += `Class learning velocities are healthy, with students maintaining study streaks across active chapters.`;
+        }
+        setDiagnosticText(diag);
+
+      } catch (err) {
+        console.error('Failed to generate insights', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    generateInsights();
+  }, [activeCode, user]);
+
+  if (loading) {
+    return (
+      <div className="tdash" style={{ padding: 'var(--sp-10)', textAlign: 'center' }}>
+        <p>Generating class insights...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="tdash" style={{ maxWidth: '900px', margin: '0 auto', padding: 'var(--sp-6)' }}>
@@ -60,7 +216,7 @@ export const AIInsightsPage: React.FC = () => {
               Weekly Educational Diagnostic
             </h3>
             <p style={{ fontSize: 'var(--fs-body-sm)', color: 'var(--color-text-secondary)', lineHeight: '1.5', marginTop: 'var(--sp-2)' }}>
-              Hello Instructor Priya Sharma! Overall class engagement has increased by 14% due to daily streaks in Science flashcards. Mathematics requires focus as BKT (Bayesian Knowledge Tracing) shows mastery probability hovering below the target threshold for 30% of the class.
+              {diagnosticText}
             </p>
           </div>
         </div>
@@ -90,3 +246,4 @@ export const AIInsightsPage: React.FC = () => {
     </div>
   );
 };
+
